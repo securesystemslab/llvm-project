@@ -1309,6 +1309,18 @@ class Base(unittest2.TestCase):
                 version = m.group(1)
         return version
 
+    def getRustCompilerVersion(self):
+        """ Returns a string that represents the rust compiler version, or None if rust is not found.
+        """
+        compiler = which("rustc")
+        if compiler:
+            version_output = system([[compiler, "--version"]])[0]
+            for line in version_output.split(os.linesep):
+                m = re.search('rustc ([0-9\.]+)', line)
+                if m:
+                    return m.group(1)
+        return None
+
     def platformIsDarwin(self):
         """Returns true if the OS triple for the selected platform is any valid apple OS"""
         return lldbplatformutil.platformIsDarwin()
@@ -1576,6 +1588,11 @@ class Base(unittest2.TestCase):
         if not module.buildGModules(self, architecture, compiler,
                                     dictionary, testdir, testname):
             raise Exception("Don't know how to build binary with gmodules")
+
+    def buildRust(self):
+        """Build the default rust binary.
+        """
+        system([[which('rustc'), '-g main.rs']])
 
     def signBinary(self, binary_path):
         if sys.platform.startswith("darwin"):
