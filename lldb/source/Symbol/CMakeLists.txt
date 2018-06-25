@@ -19,6 +19,7 @@ add_lldb_library(lldbSymbol
   LineEntry.cpp
   LineTable.cpp
   ObjectFile.cpp
+  RustASTContext.cpp
   Symbol.cpp
   SymbolContext.cpp
   SymbolFile.cpp

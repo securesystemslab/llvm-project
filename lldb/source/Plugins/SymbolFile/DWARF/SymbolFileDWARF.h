@@ -69,6 +69,7 @@ public:
   friend class DWARFUnit;
   friend class DWARFDIE;
   friend class DWARFASTParserClang;
+  friend class DWARFASTParserRust;
 
   //------------------------------------------------------------------
   // Static Functions
