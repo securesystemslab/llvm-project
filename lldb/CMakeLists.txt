@@ -28,6 +28,13 @@ if(APPLE)
   add_definitions(-DLLDB_USE_OS_LOG)
 endif()
 
+if (NOT LLDB_DISABLE_PYTHON)
+   execute_process(
+     COMMAND
+        ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/get_libdir_suffix.py
+     OUTPUT_VARIABLE LLDB_PY_LIB_SUFFIX)
+endif ()
+
 add_subdirectory(docs)
 if (NOT LLDB_DISABLE_PYTHON)
   add_subdirectory(scripts)
@@ -146,7 +153,7 @@ if (NOT LLDB_DISABLE_PYTHON)
                --cfgBldDir=${lldb_scripts_dir}
                --prefix=${CMAKE_BINARY_DIR}
                --cmakeBuildConfiguration=${CMAKE_CFG_INTDIR}
-               --lldbLibDir=lib${LLVM_LIBDIR_SUFFIX}
+               --lldbLibDir=lib${LLDB_PY_LIB_SUFFIX}
                ${use_python_wrapper_from_src_dir}
                ${use_six_py_from_system}
         VERBATIM
