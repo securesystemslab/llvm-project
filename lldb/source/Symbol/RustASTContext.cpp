@@ -1407,14 +1407,15 @@ size_t RustASTContext::GetTypeBitAlign(lldb::opaque_compiler_type_t type) {
 }
 
 uint32_t RustASTContext::GetNumChildren(lldb::opaque_compiler_type_t type,
-                                        bool omit_empty_base_classes) {
+                                        bool omit_empty_base_classes,
+                                        const ExecutionContext *exe_ctx) {
   if (!type)
     return 0;
 
   RustType *t = static_cast<RustType *>(type);
   uint32_t result = 0;
   if (RustPointer *ptr = t->AsPointer()) {
-    result = ptr->PointeeType().GetNumChildren(omit_empty_base_classes);
+    result = ptr->PointeeType().GetNumChildren(omit_empty_base_classes, exe_ctx);
     // If the pointee is not an aggregate, return 1 because the
     // pointer has a child.  Not totally sure this makes sense.
     if (result == 0)
@@ -1422,7 +1423,7 @@ uint32_t RustASTContext::GetNumChildren(lldb::opaque_compiler_type_t type,
   } else if (RustArray *array = t->AsArray()) {
     result = array->Length();
   } else if (RustTypedef *typ = t->AsTypedef()) {
-    result = typ->UnderlyingType().GetNumChildren(omit_empty_base_classes);
+    result = typ->UnderlyingType().GetNumChildren(omit_empty_base_classes, exe_ctx);
   } else if (RustAggregateBase *agg = t->AsAggregate()) {
     result = agg->FieldCount();
   }

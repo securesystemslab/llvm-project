@@ -268,7 +268,8 @@ public:
   lldb::Format GetFormat(lldb::opaque_compiler_type_t type) override;
 
   uint32_t GetNumChildren(lldb::opaque_compiler_type_t type,
-                          bool omit_empty_base_classes) override;
+                          bool omit_empty_base_classes,
+                          const ExecutionContext *exe_ctx) override;
 
   lldb::BasicType
   GetBasicTypeEnumeration(lldb::opaque_compiler_type_t type) override;
