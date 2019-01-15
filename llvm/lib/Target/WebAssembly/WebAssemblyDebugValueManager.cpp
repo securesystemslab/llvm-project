@@ -12,6 +12,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "WebAssembly.h"
 #include "WebAssemblyDebugValueManager.h"
 #include "WebAssemblyMachineFunctionInfo.h"
 #include "llvm/CodeGen/MachineInstr.h"
@@ -42,5 +43,12 @@ void WebAssemblyDebugValueManager::clone(MachineInstr *Insert,
     MachineInstr *Clone = MF->CloneMachineInstr(DBI);
     Clone->getOperand(0).setReg(NewReg);
     MBB->insert(Insert, Clone);
+  }
+}
+
+void WebAssemblyDebugValueManager::replaceWithLocal(unsigned LocalId) {
+  for (auto *DBI : DbgValues) {
+    MachineOperand &Op = DBI->getOperand(0);
+    Op.ChangeToTargetIndex(llvm::WebAssembly::TI_LOCAL_START, LocalId);
   }
 }
