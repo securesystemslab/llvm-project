@@ -518,10 +518,9 @@ RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error,
         return true;
       }
 
-      SymbolContext null_sc;
       CompilerDeclContext found_ns;
       for (const ConstString &ns_name : fullname) {
-        found_ns = symbol_file->FindNamespace(null_sc, ns_name, &found_ns);
+        found_ns = symbol_file->FindNamespace(ns_name, &found_ns);
         if (!found_ns) {
           break;
         }
