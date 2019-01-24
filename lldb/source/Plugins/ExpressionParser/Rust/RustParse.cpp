@@ -89,7 +89,7 @@ CreateValueInMemory(ExecutionContext &exe_ctx, CompilerType type, Status &error)
   }
 
   Process *proc = exe_ctx.GetProcessPtr();
-  uint64_t size = type.GetByteSize(proc);
+  uint64_t size = type.GetByteSize(proc).getValueOr(0);
   addr_t addr = proc->AllocateMemory(size,
                                      lldb::ePermissionsWritable | lldb::ePermissionsReadable,
                                      error);
