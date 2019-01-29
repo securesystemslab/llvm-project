@@ -21,8 +21,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <type_traits>
-
 #include "config.h"
 #include "libunwind.h"
 #include "libunwind_ext.h"
