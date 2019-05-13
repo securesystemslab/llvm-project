@@ -524,7 +524,10 @@ unsigned WebAssemblyFastISel::zeroExtend(unsigned Reg, const Value *V,
     return Result;
   }
 
-  return zeroExtendToI32(Reg, V, From);
+  if (To == MVT::i32)
+    return zeroExtendToI32(Reg, V, From);
+
+  return 0;
 }
 
 unsigned WebAssemblyFastISel::signExtend(unsigned Reg, const Value *V,
@@ -543,7 +546,10 @@ unsigned WebAssemblyFastISel::signExtend(unsigned Reg, const Value *V,
     return Result;
   }
 
-  return signExtendToI32(Reg, V, From);
+  if (To == MVT::i32)
+    return signExtendToI32(Reg, V, From);
+
+  return 0;
 }
 
 unsigned WebAssemblyFastISel::getRegForUnsignedValue(const Value *V) {
