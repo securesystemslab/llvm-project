@@ -85,8 +85,8 @@ struct GCOVOptions {
   std::string Exclude;
 };
 
-ModulePass *createGCOVProfilerPass(const GCOVOptions &Options =
-                                   GCOVOptions::getDefault());
+ModulePass *
+createGCOVProfilerPass(const GCOVOptions &Options = GCOVOptions::getDefault());
 
 // PGO Instrumention
 ModulePass *createPGOInstrumentationGenLegacyPass();
@@ -202,6 +202,10 @@ struct SanitizerCoverageOptions {
 // Insert SanitizerCoverage instrumentation.
 ModulePass *createSanitizerCoverageModulePass(
     const SanitizerCoverageOptions &Options = SanitizerCoverageOptions());
+
+ModulePass *createMpkCallGatesLegacyPassPass();
+
+ModulePass * createMpkRemoveInlineAttrPass();
 
 /// Calculate what to divide by to scale counts.
 ///

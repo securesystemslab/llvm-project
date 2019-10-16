@@ -8,6 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Clang.h"
+#include "AMDGPU.h"
 #include "Arch/AArch64.h"
 #include "Arch/ARM.h"
 #include "Arch/Mips.h"
@@ -16,11 +17,10 @@
 #include "Arch/Sparc.h"
 #include "Arch/SystemZ.h"
 #include "Arch/X86.h"
-#include "AMDGPU.h"
 #include "CommonArgs.h"
 #include "Hexagon.h"
-#include "MSP430.h"
 #include "InputInfo.h"
+#include "MSP430.h"
 #include "PS4CPU.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/LangOptions.h"
@@ -28,6 +28,7 @@
 #include "clang/Basic/Version.h"
 #include "clang/Driver/Distro.h"
 #include "clang/Driver/DriverDiagnostic.h"
+#include "clang/Driver/MPKUntrustedArgs.h"
 #include "clang/Driver/Options.h"
 #include "clang/Driver/SanitizerArgs.h"
 #include "clang/Driver/XRayArgs.h"
@@ -4480,6 +4481,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   const SanitizerArgs &Sanitize = TC.getSanitizerArgs();
   Sanitize.addArgs(TC, Args, CmdArgs, InputType);
+
+  const MPKUntrustedArgs &MPKUntrusted = TC.getMPKUntrustedArgs();
+  MPKUntrusted.addArgs(TC, Args, CmdArgs, InputType);
 
   const XRayArgs &XRay = TC.getXRayArgs();
   XRay.addArgs(TC, Args, CmdArgs, InputType);

@@ -3171,3 +3171,14 @@ def ObjCExternallyRetained : InheritableAttr {
   let Subjects = SubjectList<[NonParmVar, Function, Block, ObjCMethod]>;
   let Documentation = [ObjCExternallyRetainedDocs];
 }
+
+def RustAllocator : InheritableAttr {
+  let Spellings = [GCC<"rust_allocator">, Declspec<"rust_allocator">];
+  let Subjects = SubjectList<[Function]>;
+  let Documentation = [Undocumented];
+}
+def Untrusted : InheritableAttr {
+  let Spellings = [GCC<"untrusted">, Declspec<"untrusted">];
+  let Subjects = SubjectList<[Function]>;
+  let Documentation = [Undocumented];
+}

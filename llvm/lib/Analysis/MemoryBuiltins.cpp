@@ -109,6 +109,7 @@ static const std::pair<LibFunc, AllocFnsTy> AllocationFnData[] = {
 
   {LibFunc_rust_alloc,         {MallocLike,  2, 0,  -1}},
   {LibFunc_rust_realloc,       {ReallocLike,  4, 3,  -1}},
+  {LibFunc_rust_untrusted_alloc,{MallocLike,  2, 0,  -1}},
   // TODO: Handle "int posix_memalign(void **, size_t, size_t)"
 };
 

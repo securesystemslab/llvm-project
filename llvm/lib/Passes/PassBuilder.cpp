@@ -69,6 +69,8 @@
 #include "llvm/Transforms/IPO/ConstantMerge.h"
 #include "llvm/Transforms/IPO/CrossDSOCFI.h"
 #include "llvm/Transforms/IPO/DeadArgumentElimination.h"
+#include "llvm/Transforms/IPO/DynUntrustedAllocPost.h"
+#include "llvm/Transforms/IPO/DynUntrustedAllocPre.h"
 #include "llvm/Transforms/IPO/ElimAvailExtern.h"
 #include "llvm/Transforms/IPO/ForceFunctionAttrs.h"
 #include "llvm/Transforms/IPO/FunctionAttrs.h"
@@ -95,8 +97,8 @@
 #include "llvm/Transforms/Instrumentation/GCOVProfiler.h"
 #include "llvm/Transforms/Instrumentation/InstrProfiling.h"
 #include "llvm/Transforms/Instrumentation/MemorySanitizer.h"
-#include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 #include "llvm/Transforms/Instrumentation/PGOInstrumentation.h"
+#include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 #include "llvm/Transforms/Scalar/ADCE.h"
 #include "llvm/Transforms/Scalar/AlignmentFromAssumptions.h"
 #include "llvm/Transforms/Scalar/BDCE.h"
@@ -210,6 +212,9 @@ static cl::opt<bool>
               cl::desc("Enable control height reduction optimization (CHR)"));
 
 extern cl::opt<bool> EnableHotColdSplit;
+
+extern cl::opt<bool> ProfileMPK;
+extern cl::opt<std::string> MPKProfilePath;
 
 static bool isOptimizingForSize(PassBuilder::OptimizationLevel Level) {
   switch (Level) {
@@ -1031,6 +1036,9 @@ PassBuilder::buildLTODefaultPipeline(OptimizationLevel Level, bool DebugLogging,
   // Do basic inference of function attributes from known properties of system
   // libraries and other oracles.
   MPM.addPass(InferFunctionAttrsPass());
+
+  if (ProfileMPK || !MPKProfilePath.empty())
+    MPM.addPass(DynUntrustedAllocPrePass());
 
   if (Level > 1) {
     FunctionPassManager EarlyFPM(DebugLogging);

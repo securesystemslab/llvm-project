@@ -798,6 +798,8 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
         continue;
       // Those attributes should be safe to propagate to the extracted function.
       case Attribute::AlwaysInline:
+      case Attribute::Untrusted:
+      case Attribute::RustAllocator:
       case Attribute::Cold:
       case Attribute::NoRecurse:
       case Attribute::InlineHint:

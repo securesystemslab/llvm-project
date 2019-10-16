@@ -1176,6 +1176,17 @@ def fcf_protection : Flag<["-"], "fcf-protection">, Group<f_Group>, Flags<[CoreO
   Alias<fcf_protection_EQ>, AliasArgs<["full"]>,
   HelpText<"Enable cf-protection in 'full' mode">;
 
+def fprofile_mpk : Flag<["-"], "fprofile-mpk">, Group<f_Group>,
+  Flags<[CC1Option]>,
+  HelpText<"Enable MPK untrusted dynamic analysis">;
+def fnoprofile_mpk : Flag<["-"], "fno-profile-mpk">, Group<f_Group>,
+  Flags<[CC1Option]>;
+
+def finstr_mpk :
+  JoinedOrSeparate<["-"], "finstr-mpk=">,
+  Group<f_Group>, Flags<[CC1Option]>,
+  HelpText<"File or Folder name containing profiling information.">;
+
 def fxray_instrument : Flag<["-"], "fxray-instrument">, Group<f_Group>,
   Flags<[CC1Option]>,
   HelpText<"Generate XRay instrumentation sleds on function entry and exit">;

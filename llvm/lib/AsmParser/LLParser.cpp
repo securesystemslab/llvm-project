@@ -1229,6 +1229,8 @@ bool LLParser::ParseFnAttributeValuePairs(AttrBuilder &B,
       continue;
     }
     case lltok::kw_alwaysinline: B.addAttribute(Attribute::AlwaysInline); break;
+    case lltok::kw_untrusted: B.addAttribute(Attribute::Untrusted); break;
+    case lltok::kw_rust_allocator: B.addAttribute(Attribute::RustAllocator); break;
     case lltok::kw_argmemonly: B.addAttribute(Attribute::ArgMemOnly); break;
     case lltok::kw_builtin: B.addAttribute(Attribute::Builtin); break;
     case lltok::kw_cold: B.addAttribute(Attribute::Cold); break;
@@ -1599,6 +1601,8 @@ bool LLParser::ParseOptionalParamAttrs(AttrBuilder &B) {
 
     case lltok::kw_alignstack:
     case lltok::kw_alwaysinline:
+    case lltok::kw_untrusted:
+    case lltok::kw_rust_allocator:
     case lltok::kw_argmemonly:
     case lltok::kw_builtin:
     case lltok::kw_inlinehint:
@@ -1695,6 +1699,8 @@ bool LLParser::ParseOptionalReturnAttrs(AttrBuilder &B) {
 
     case lltok::kw_alignstack:
     case lltok::kw_alwaysinline:
+    case lltok::kw_untrusted:
+    case lltok::kw_rust_allocator:
     case lltok::kw_argmemonly:
     case lltok::kw_builtin:
     case lltok::kw_cold:

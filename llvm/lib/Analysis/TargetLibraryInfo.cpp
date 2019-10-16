@@ -1403,6 +1403,7 @@ bool TargetLibraryInfoImpl::isValidProtoForLibFunc(const FunctionType &FTy,
       return false;
   }
 
+  case LibFunc_rust_untrusted_alloc:
   case LibFunc_rust_alloc:
     return (NumParams == 3 && FTy.getReturnType()->isPointerTy() &&
             FTy.getParamType(0)->isIntegerTy() &&

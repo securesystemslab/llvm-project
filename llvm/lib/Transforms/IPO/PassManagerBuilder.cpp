@@ -160,6 +160,17 @@ static cl::opt<bool>
     EnableCHR("enable-chr", cl::init(true), cl::Hidden,
               cl::desc("Enable control height reduction optimization (CHR)"));
 
+cl::opt<bool>
+    ProfileMPK("profile-mpk", cl::init(false), cl::Hidden,
+               cl::desc("Enables the static instrumentation for "
+                        "the MPK Untrusted Analysis pass."));
+
+cl::opt<std::string>
+    MPKProfilePath("instr-mpk", cl::init(""), cl::Hidden,
+                   cl::desc("Input for profiling information and "
+                            "final instrumentation."),
+                   cl::value_desc("pathname"));
+
 PassManagerBuilder::PassManagerBuilder() {
     OptLevel = 2;
     SizeLevel = 0;
@@ -432,14 +443,32 @@ void PassManagerBuilder::populateModulePassManager(
 
   // Allow forcing function attributes as a debugging and tuning aid.
   MPM.add(createForceFunctionAttrsLegacyPass());
-
+  
   // If all optimizations are disabled, just run the always-inline pass and,
   // if enabled, the function merging pass.
   if (OptLevel == 0) {
     addPGOInstrPasses(MPM);
+
+    // Run DynUntrustedAlloctionPre before Inliner
+    if (ProfileMPK || !MPKProfilePath.empty())
+      MPM.add(createDynUntrustedAllocPrePass());
+
     if (Inliner) {
       MPM.add(Inliner);
       Inliner = nullptr;
+    }
+
+    // Run DynUntrustedAllocationPost after inliner to assign unique IDs to
+    // allocation hooks.
+    if (ProfileMPK && !MPKProfilePath.empty()) {
+      // In case we ever want to profile AND modify call sites already found.
+      MPM.add(createDynUntrustedAllocPostPass(MPKProfilePath,
+                                              /* remove_hooks */ false));
+    } else if (ProfileMPK) {
+      MPM.add(createDynUntrustedAllocPostPass());
+    } else if (!MPKProfilePath.empty()) {
+      MPM.add(createDynUntrustedAllocPostPass(MPKProfilePath,
+                                              /* remove_hooks */ true));
     }
 
     // FIXME: The BarrierNoopPass is a HACK! The inliner pass above implicitly
@@ -531,6 +560,10 @@ void PassManagerBuilder::populateModulePassManager(
   // for the entire SCC pass run below.
   MPM.add(createGlobalsAAWrapperPass());
 
+  // Run DynUntrustedAlloctionPre before Inliner
+  if (ProfileMPK || !MPKProfilePath.empty())
+    MPM.add(createDynUntrustedAllocPrePass());
+
   // Start of CallGraph SCC passes.
   MPM.add(createPruneEHPass()); // Remove dead EH info
   bool RunInliner = false;
@@ -538,6 +571,19 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(Inliner);
     Inliner = nullptr;
     RunInliner = true;
+  }
+
+  // Run DynUntrustedAllocationPost after inliner to assign unique IDs to
+  // allocation hooks.
+  if (ProfileMPK && !MPKProfilePath.empty()) {
+    // In case we ever want to profile AND modify call sites already found.
+    MPM.add(createDynUntrustedAllocPostPass(MPKProfilePath,
+                                            /* remove_hooks */ false));
+  } else if (ProfileMPK) {
+    MPM.add(createDynUntrustedAllocPostPass());
+  } else if (!MPKProfilePath.empty()) {
+    MPM.add(createDynUntrustedAllocPostPass(MPKProfilePath,
+                                            /* remove_hooks */ true));
   }
 
   MPM.add(createPostOrderFunctionAttrsLegacyPass());
@@ -774,6 +820,7 @@ void PassManagerBuilder::addLTOOptimizationPasses(legacy::PassManagerBase &PM) {
   // Infer attributes about declarations if possible.
   PM.add(createInferFunctionAttrsLegacyPass());
 
+
   if (OptLevel > 1) {
     // Split call-site with more constrained arguments.
     PM.add(createCallSiteSplittingPass());
@@ -833,11 +880,28 @@ void PassManagerBuilder::addLTOOptimizationPasses(legacy::PassManagerBase &PM) {
   addInstructionCombiningPass(PM);
   addExtensionsToPM(EP_Peephole, PM);
 
+  // Run DynUntrustedAlloctionPre before Inliner
+  if (ProfileMPK || !MPKProfilePath.empty())
+    PM.add(createDynUntrustedAllocPrePass());
+
   // Inline small functions
   bool RunInliner = Inliner;
   if (RunInliner) {
     PM.add(Inliner);
     Inliner = nullptr;
+  }
+
+  // Run DynUntrustedAllocationPost after inliner to assign unique IDs to
+  // allocation hooks.
+  if (ProfileMPK && !MPKProfilePath.empty()) {
+    // In case we ever want to profile AND modify call sites already found.
+    PM.add(createDynUntrustedAllocPostPass(MPKProfilePath,
+                                           /* remove_hooks */ false));
+  } else if (ProfileMPK) {
+    PM.add(createDynUntrustedAllocPostPass());
+  } else if (!MPKProfilePath.empty()) {
+    PM.add(createDynUntrustedAllocPostPass(MPKProfilePath,
+                                           /* remove_hooks */ true));
   }
 
   PM.add(createPruneEHPass());   // Remove dead EH info.

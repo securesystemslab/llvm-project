@@ -44,6 +44,7 @@ FEATURE(hwaddress_sanitizer,
         LangOpts.Sanitize.hasOneOf(SanitizerKind::HWAddress |
                                    SanitizerKind::KernelHWAddress))
 FEATURE(xray_instrument, LangOpts.XRayInstrument)
+FEATURE(mpk_untrusted, LangOpts.MPKUntrusted)
 FEATURE(undefined_behavior_sanitizer,
         LangOpts.Sanitize.hasOneOf(SanitizerKind::Undefined))
 FEATURE(assume_nonnull, true)

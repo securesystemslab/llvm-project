@@ -17,6 +17,7 @@ add_clang_library(clangDriver
   Driver.cpp
   DriverOptions.cpp
   Job.cpp
+  MPKUntrustedArgs.cpp
   Multilib.cpp
   Phases.cpp
   SanitizerArgs.cpp

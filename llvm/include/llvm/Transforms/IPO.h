@@ -261,6 +261,13 @@ createWholeProgramDevirtPass(ModuleSummaryIndex *ExportSummary,
 /// devirtualization and control-flow integrity.
 ModulePass *createGlobalSplitPass();
 
+// Patches Dynamic Function Calls to Allocation sites for analysis pre-Inliner
+ModulePass *createDynUntrustedAllocPrePass();
+
+// Patches Function Hooks with Unique Identifier post-Inliner
+ModulePass *createDynUntrustedAllocPostPass(std::string mpk_profile_path = "",
+                                            bool remove_hooks = false);
+
 //===----------------------------------------------------------------------===//
 // SampleProfilePass - Loads sample profile data from disk and generates
 // IR metadata to reflect the profile.

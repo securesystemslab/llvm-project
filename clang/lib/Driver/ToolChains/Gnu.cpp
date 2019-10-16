@@ -468,6 +468,7 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   bool NeedsSanitizerDeps = addSanitizerRuntimes(ToolChain, Args, CmdArgs);
   bool NeedsXRayDeps = addXRayRuntime(ToolChain, Args, CmdArgs);
+  bool NeedsMPKUntrustedDeps = addMPKUntrustedRuntime(ToolChain, Args, CmdArgs);
   AddLinkerInputs(ToolChain, Inputs, Args, CmdArgs, JA);
   // The profile runtime also needs access to system libraries.
   getToolChain().addProfileRTLibs(Args, CmdArgs);
@@ -498,6 +499,9 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
       if (NeedsXRayDeps)
         linkXRayRuntimeDeps(ToolChain, CmdArgs);
+
+      if (NeedsMPKUntrustedDeps)
+        linkMPKUntrustedRuntimeDeps(ToolChain, CmdArgs);
 
       bool WantPthread = Args.hasArg(options::OPT_pthread) ||
                          Args.hasArg(options::OPT_pthreads);

@@ -23,6 +23,12 @@ def AllocSize : EnumAttr<"allocsize">;
 /// inline=always.
 def AlwaysInline : EnumAttr<"alwaysinline">;
 
+/// UntrustedFunction
+def Untrusted : EnumAttr<"untrusted">;
+
+/// Function Allocates memory for rust types(ie a wrapper)
+def RustAllocator : EnumAttr<"rust_allocator">;
+
 /// Function can access memory only using pointers based on its arguments.
 def ArgMemOnly : EnumAttr<"argmemonly">;
 

@@ -172,6 +172,7 @@ void initializeIRTranslatorPass(PassRegistry&);
 void initializeIVUsersWrapperPassPass(PassRegistry&);
 void initializeIfConverterPass(PassRegistry&);
 void initializeImplicitNullChecksPass(PassRegistry&);
+void initializeMpkCallGatesLegacyPassPass(PassRegistry&);
 void initializeIndVarSimplifyLegacyPassPass(PassRegistry&);
 void initializeIndirectBrExpandPassPass(PassRegistry&);
 void initializeInferAddressSpacesPass(PassRegistry&);
@@ -409,6 +410,9 @@ void initializeWinEHPreparePass(PassRegistry&);
 void initializeWriteBitcodePassPass(PassRegistry&);
 void initializeWriteThinLTOBitcodePass(PassRegistry&);
 void initializeXRayInstrumentationPass(PassRegistry&);
+void initializeDynUntrustedAllocPrePass(PassRegistry &);
+void initializeDynUntrustedAllocPostPass(PassRegistry &);
+void initializeMpkRemoveInlineAttrPass(PassRegistry &);
 
 } // end namespace llvm
 

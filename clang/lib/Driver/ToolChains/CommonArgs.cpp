@@ -27,6 +27,7 @@
 #include "clang/Driver/Driver.h"
 #include "clang/Driver/DriverDiagnostic.h"
 #include "clang/Driver/Job.h"
+#include "clang/Driver/MPKUntrustedArgs.h"
 #include "clang/Driver/Options.h"
 #include "clang/Driver/SanitizerArgs.h"
 #include "clang/Driver/ToolChain.h"
@@ -53,6 +54,7 @@
 #include "llvm/Support/TargetParser.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/YAMLParser.h"
+#include <llvm/ADT/Triple.h>
 
 using namespace clang::driver;
 using namespace clang::driver::tools;
@@ -750,6 +752,30 @@ bool tools::addSanitizerRuntimes(const ToolChain &TC, const ArgList &Args,
     CmdArgs.push_back("-export-dynamic-symbol=__cfi_check");
 
   return !StaticRuntimes.empty() || !NonWholeStaticRuntimes.empty();
+}
+
+bool tools::addMPKUntrustedRuntime(const ToolChain &TC, const ArgList &Args,
+                                   ArgStringList &CmdArgs) {
+  if (TC.getMPKUntrustedArgs().needsMPKUntrustedRt()) {
+    CmdArgs.push_back("-whole-archive");
+    CmdArgs.push_back(TC.getCompilerRTArgString(Args, "mpk_untrusted", false));
+    CmdArgs.push_back("-no-whole-archive");
+    return true;
+  }
+
+  return false;
+}
+
+void tools::linkMPKUntrustedRuntimeDeps(const ToolChain &TC,
+                                        ArgStringList &CmdArgs) {
+  CmdArgs.push_back("--no-as-needed");
+  if (TC.getTriple().getOS() != llvm::Triple::OpenBSD)
+    CmdArgs.push_back("-lrt");
+  CmdArgs.push_back("-lm");
+  CmdArgs.push_back("-lstdc++");
+  CmdArgs.push_back("-lpthread");
+  CmdArgs.push_back("-ldl");
+  CmdArgs.push_back("-ltinfo");
 }
 
 bool tools::addXRayRuntime(const ToolChain&TC, const ArgList &Args, ArgStringList &CmdArgs) {
