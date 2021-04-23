@@ -16,6 +16,7 @@
 #define LLVM_MCA_SOURCEMGR_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/MCA/Instruction.h"
 
 namespace llvm {
@@ -25,32 +26,95 @@ namespace mca {
 // prevent compiler error C2139 about intrinsic type trait '__is_assignable'.
 typedef std::pair<unsigned, const Instruction &> SourceRef;
 
-class SourceMgr {
-  using UniqueInst = std::unique_ptr<Instruction>;
-  ArrayRef<UniqueInst> Sequence;
+class SourceMgrBase {
+protected:
   unsigned Current;
-  const unsigned Iterations;
-  static const unsigned DefaultIterations = 100;
+
+  SourceMgrBase(): Current(0U) {}
 
 public:
-  SourceMgr(ArrayRef<UniqueInst> S, unsigned Iter)
-      : Sequence(S), Current(0), Iterations(Iter ? Iter : DefaultIterations) {}
+  using UniqueInst = std::unique_ptr<Instruction>;
 
-  unsigned getNumIterations() const { return Iterations; }
-  unsigned size() const { return Sequence.size(); }
-  bool hasNext() const { return Current < (Iterations * Sequence.size()); }
+  virtual unsigned size() const = 0;
+
+  virtual bool hasNext() const = 0;
+
+  virtual bool isEnd() const = 0;
+
+  virtual SourceRef peekNext() const = 0;
+
   void updateNext() { ++Current; }
+};
 
-  SourceRef peekNext() const {
-    assert(hasNext() && "Already at end of sequence!");
-    return SourceRef(Current, *Sequence[Current % Sequence.size()]);
-  }
+template<class StorageT>
+class SourceMgrImpl : public SourceMgrBase {
+protected:
+  StorageT Sequence;
 
-  using const_iterator = ArrayRef<UniqueInst>::const_iterator;
+  SourceMgrImpl() = default;
+
+  SourceMgrImpl(StorageT S) : Sequence(S) {}
+
+public:
+  using const_iterator = typename StorageT::const_iterator;
   const_iterator begin() const { return Sequence.begin(); }
   const_iterator end() const { return Sequence.end(); }
 };
 
+class CircularSourceMgr
+  : public SourceMgrImpl<ArrayRef<SourceMgrBase::UniqueInst>> {
+  const unsigned Iterations;
+  static const unsigned DefaultIterations = 100;
+
+public:
+  CircularSourceMgr(ArrayRef<UniqueInst> S, unsigned Iter)
+      : SourceMgrImpl(S),
+        Iterations(Iter ? Iter : DefaultIterations) {}
+
+  unsigned size() const override { return Sequence.size(); }
+
+  unsigned getNumIterations() const { return Iterations; }
+  bool hasNext() const override {
+    return Current < (Iterations * Sequence.size());
+  }
+  bool isEnd() const override { return !hasNext(); }
+
+  SourceRef peekNext() const override {
+    assert(hasNext() && "Already at end of sequence!");
+    return SourceRef(Current, *Sequence[Current % Sequence.size()]);
+  }
+};
+
+/// Using CircularSourceMgr by default
+using SourceMgr = CircularSourceMgr;
+
+class IncrementalSourceMgr
+  : public SourceMgrImpl<SmallVector<SourceMgrBase::UniqueInst, 8>> {
+  bool EOS;
+
+public:
+  IncrementalSourceMgr(): SourceMgrImpl(), EOS(false) {}
+
+  unsigned size() const override { return Sequence.size(); }
+
+  bool hasNext() const override {
+    return Current < Sequence.size();
+  }
+  bool isEnd() const override {
+    return EOS;
+  }
+
+  SourceRef peekNext() const override {
+    assert(hasNext());
+    return SourceRef(Current, *Sequence[Current]);
+  }
+
+  void addInst(UniqueInst &&Inst) {
+    Sequence.emplace_back(std::move(Inst));
+  }
+
+  void endOfStream() { EOS = true; }
+};
 } // namespace mca
 } // namespace llvm
 
