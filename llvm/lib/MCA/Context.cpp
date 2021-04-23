@@ -29,7 +29,7 @@ namespace llvm {
 namespace mca {
 
 std::unique_ptr<Pipeline>
-Context::createDefaultPipeline(const PipelineOptions &Opts, SourceMgr &SrcMgr,
+Context::createDefaultPipeline(const PipelineOptions &Opts, SourceMgrBase &SrcMgr,
                                CustomBehaviour &CB) {
   const MCSchedModel &SM = STI.getSchedModel();
 
@@ -70,7 +70,7 @@ Context::createDefaultPipeline(const PipelineOptions &Opts, SourceMgr &SrcMgr,
 }
 
 std::unique_ptr<Pipeline>
-Context::createInOrderPipeline(const PipelineOptions &Opts, SourceMgr &SrcMgr,
+Context::createInOrderPipeline(const PipelineOptions &Opts, SourceMgrBase &SrcMgr,
                                CustomBehaviour &CB) {
   const MCSchedModel &SM = STI.getSchedModel();
   auto PRF = std::make_unique<RegisterFile>(SM, MRI, Opts.RegisterFileSize);
