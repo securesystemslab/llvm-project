@@ -14,6 +14,7 @@
 #ifndef LLVM_MCA_INSTRBUILDER_H
 #define LLVM_MCA_INSTRBUILDER_H
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/MC/MCInstrAnalysis.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
@@ -21,9 +22,32 @@
 #include "llvm/MCA/Instruction.h"
 #include "llvm/MCA/Support.h"
 #include "llvm/Support/Error.h"
+#include <system_error>
 
 namespace llvm {
 namespace mca {
+
+class RecycledInstErr : public ErrorInfo<RecycledInstErr> {
+  Instruction *RecycledInst;
+
+public:
+  static char ID;
+
+  explicit RecycledInstErr(Instruction *Inst)
+    : RecycledInst(Inst) {}
+  // Always need to carry an Instruction
+  RecycledInstErr() = delete;
+
+  Instruction *getInst() { return RecycledInst; }
+
+  void log(raw_ostream &OS) const override {
+    OS << "Instruction is recycled\n";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return std::make_error_code(std::errc::no_message);
+  }
+};
 
 /// A builder class that knows how to construct Instruction objects.
 ///
@@ -48,8 +72,12 @@ class InstrBuilder {
   bool FirstCallInst;
   bool FirstReturnInst;
 
-  Expected<const InstrDesc &> createInstrDescImpl(const MCInst &MCI);
-  Expected<const InstrDesc &> getOrCreateInstrDesc(const MCInst &MCI);
+  llvm::function_ref<Instruction*(const MCInst&)> InstRecycleCallback;
+
+  Expected<const InstrDesc &> createInstrDescImpl(const MCInst &MCI,
+                                                  bool &Static);
+  Expected<const InstrDesc &> getOrCreateInstrDesc(const MCInst &MCI,
+                                                   bool &Static);
 
   InstrBuilder(const InstrBuilder &) = delete;
   InstrBuilder &operator=(const InstrBuilder &) = delete;
@@ -67,6 +95,10 @@ public:
     VariantDescriptors.clear();
     FirstCallInst = true;
     FirstReturnInst = true;
+  }
+
+  void setInstRecycleCallback(decltype(InstRecycleCallback) CB) {
+    InstRecycleCallback = CB;
   }
 
   Expected<std::unique_ptr<Instruction>> createInstruction(const MCInst &MCI);

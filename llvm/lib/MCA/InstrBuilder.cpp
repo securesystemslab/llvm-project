@@ -14,6 +14,7 @@
 #include "llvm/MCA/InstrBuilder.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/WithColor.h"
@@ -23,6 +24,8 @@
 
 namespace llvm {
 namespace mca {
+
+char RecycledInstErr::ID = 0;
 
 InstrBuilder::InstrBuilder(const llvm::MCSubtargetInfo &sti,
                            const llvm::MCInstrInfo &mcii,
@@ -535,8 +538,11 @@ Error InstrBuilder::verifyInstrDesc(const InstrDesc &ID,
   return make_error<InstructionError<MCInst>>(std::string(Message), MCI);
 }
 
+STATISTIC(NumStaticInstrDescCreated, "Number of created static InstrDesc");
+STATISTIC(NumVariantInstrDescCreated, "Number of created variadic InstrDesc");
+
 Expected<const InstrDesc &>
-InstrBuilder::createInstrDescImpl(const MCInst &MCI) {
+InstrBuilder::createInstrDescImpl(const MCInst &MCI, bool &StaticDesc) {
   assert(STI.getSchedModel().hasInstrSchedModel() &&
          "Itineraries are not yet supported!");
 
@@ -618,34 +624,61 @@ InstrBuilder::createInstrDescImpl(const MCInst &MCI) {
 
   // Now add the new descriptor.
   bool IsVariadic = MCDesc.isVariadic();
-  if (!IsVariadic && !IsVariant) {
+  StaticDesc = !IsVariadic && !IsVariant;
+  if (StaticDesc) {
+    ++NumStaticInstrDescCreated;
     Descriptors[MCI.getOpcode()] = std::move(ID);
     return *Descriptors[MCI.getOpcode()];
   }
 
+  ++NumVariantInstrDescCreated;
   VariantDescriptors[&MCI] = std::move(ID);
   return *VariantDescriptors[&MCI];
 }
 
+STATISTIC(NumStaticInstrDescCacheHit, "Number of static InstrDesc cache hit");
+STATISTIC(NumVariantInstrDescCacheHit, "Number of variadic InstrDesc cache hit");
+
 Expected<const InstrDesc &>
-InstrBuilder::getOrCreateInstrDesc(const MCInst &MCI) {
-  if (Descriptors.find_as(MCI.getOpcode()) != Descriptors.end())
+InstrBuilder::getOrCreateInstrDesc(const MCInst &MCI, bool &StaticDesc) {
+  if (Descriptors.find_as(MCI.getOpcode()) != Descriptors.end()) {
+    NumStaticInstrDescCacheHit++;
+    StaticDesc = true;
     return *Descriptors[MCI.getOpcode()];
+  }
 
-  if (VariantDescriptors.find(&MCI) != VariantDescriptors.end())
+  if (VariantDescriptors.find(&MCI) != VariantDescriptors.end()) {
+    NumVariantInstrDescCacheHit++;
+    StaticDesc = false;
     return *VariantDescriptors[&MCI];
+  }
 
-  return createInstrDescImpl(MCI);
+  return createInstrDescImpl(MCI, StaticDesc);
 }
 
 Expected<std::unique_ptr<Instruction>>
 InstrBuilder::createInstruction(const MCInst &MCI) {
-  Expected<const InstrDesc &> DescOrErr = getOrCreateInstrDesc(MCI);
+  bool IsStaticDesc = false;
+  Expected<const InstrDesc &> DescOrErr = getOrCreateInstrDesc(MCI,
+                                                               IsStaticDesc);
   if (!DescOrErr)
     return DescOrErr.takeError();
   const InstrDesc &D = *DescOrErr;
-  std::unique_ptr<Instruction> NewIS =
-      std::make_unique<Instruction>(D, MCI.getOpcode());
+  Instruction *NewIS = nullptr;
+  std::unique_ptr<Instruction> CreatedIS;
+  bool IsInstRecycled = false;
+
+  if (IsStaticDesc && InstRecycleCallback) {
+    if (auto *I = InstRecycleCallback(MCI)) {
+      NewIS = I;
+      NewIS->reset();
+      IsInstRecycled = true;
+    }
+  }
+  if (!IsInstRecycled) {
+    CreatedIS = std::make_unique<Instruction>(D, MCI.getOpcode());
+    NewIS = CreatedIS.get();
+  }
 
   // Check if this is a dependency breaking instruction.
   APInt Mask;
@@ -663,7 +696,8 @@ InstrBuilder::createInstruction(const MCInst &MCI) {
 
   // Initialize Reads first.
   MCPhysReg RegID = 0;
-  for (const ReadDescriptor &RD : D.Reads) {
+  for (size_t Idx = 0U, E = D.Reads.size(); Idx < E; ++Idx) {
+    const ReadDescriptor &RD = D.Reads[Idx];
     if (!RD.isImplicitRead()) {
       // explicit read.
       const MCOperand &Op = MCI.getOperand(RD.OpIndex);
@@ -681,15 +715,22 @@ InstrBuilder::createInstruction(const MCInst &MCI) {
       continue;
 
     // Okay, this is a register operand. Create a ReadState for it.
-    NewIS->getUses().emplace_back(RD, RegID);
-    ReadState &RS = NewIS->getUses().back();
+    ReadState *RS = nullptr;
+    if (IsInstRecycled) {
+      assert(Idx < NewIS->getUses().size());
+      NewIS->getUses()[Idx] = ReadState(RD, RegID);
+      RS = &NewIS->getUses()[Idx];
+    } else {
+      NewIS->getUses().emplace_back(RD, RegID);
+      RS = &NewIS->getUses().back();
+    }
 
     if (IsDepBreaking) {
       // A mask of all zeroes means: explicit input operands are not
       // independent.
       if (Mask.isNullValue()) {
         if (!RD.isImplicitRead())
-          RS.setIndependentFromDef();
+          RS->setIndependentFromDef();
       } else {
         // Check if this register operand is independent according to `Mask`.
         // Note that Mask may not have enough bits to describe all explicit and
@@ -699,15 +740,19 @@ InstrBuilder::createInstruction(const MCInst &MCI) {
         if (Mask.getBitWidth() > RD.UseIndex) {
           // Okay. This map describe register use `RD.UseIndex`.
           if (Mask[RD.UseIndex])
-            RS.setIndependentFromDef();
+            RS->setIndependentFromDef();
         }
       }
     }
   }
 
   // Early exit if there are no writes.
-  if (D.Writes.empty())
-    return std::move(NewIS);
+  if (D.Writes.empty()) {
+    if (IsInstRecycled)
+      return llvm::make_error<RecycledInstErr>(NewIS);
+    else
+      return std::move(CreatedIS);
+  }
 
   // Track register writes that implicitly clear the upper portion of the
   // underlying super-registers using an APInt.
@@ -720,7 +765,8 @@ InstrBuilder::createInstruction(const MCInst &MCI) {
 
   // Initialize writes.
   unsigned WriteIndex = 0;
-  for (const WriteDescriptor &WD : D.Writes) {
+  for (size_t Idx = 0U, E = D.Writes.size(); Idx < E; ++Idx) {
+    const WriteDescriptor &WD = D.Writes[Idx];
     RegID = WD.isImplicitWrite() ? WD.RegisterID
                                  : MCI.getOperand(WD.OpIndex).getReg();
     // Check if this is a optional definition that references NoReg.
@@ -730,13 +776,23 @@ InstrBuilder::createInstruction(const MCInst &MCI) {
     }
 
     assert(RegID && "Expected a valid register ID!");
-    NewIS->getDefs().emplace_back(WD, RegID,
-                                  /* ClearsSuperRegs */ WriteMask[WriteIndex],
-                                  /* WritesZero */ IsZeroIdiom);
+    if (IsInstRecycled) {
+      assert(Idx < NewIS->getDefs().size());
+      NewIS->getDefs()[Idx] = WriteState(WD, RegID,
+                                         /* ClearsSuperRegs */ WriteMask[WriteIndex],
+                                         /* WritesZero */ IsZeroIdiom);
+    } else {
+      NewIS->getDefs().emplace_back(WD, RegID,
+                                    /* ClearsSuperRegs */ WriteMask[WriteIndex],
+                                    /* WritesZero */ IsZeroIdiom);
+    }
     ++WriteIndex;
   }
 
-  return std::move(NewIS);
+  if (IsInstRecycled)
+    return llvm::make_error<RecycledInstErr>(NewIS);
+  else
+    return std::move(CreatedIS);
 }
 } // namespace mca
 } // namespace llvm

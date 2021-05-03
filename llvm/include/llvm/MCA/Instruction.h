@@ -558,7 +558,7 @@ public:
 
   // Returns true if this instruction is a candidate for move elimination.
   bool isOptimizableMove() const { return IsOptimizableMove; }
-  void setOptimizableMove() { IsOptimizableMove = true; }
+  void setOptimizableMove(bool Val = true) { IsOptimizableMove = Val; }
   bool isMemOp() const { return Desc.MayLoad || Desc.MayStore; }
 };
 
@@ -618,6 +618,18 @@ public:
         CyclesLeft(UNKNOWN_CYCLES), RCUTokenID(0), LSUTokenID(0),
         UsedBuffers(D.UsedBuffers), CriticalRegDep(), CriticalMemDep(),
         CriticalResourceMask(0), IsEliminated(false) {}
+
+  void reset() {
+    // Note that this won't clear read/write descriptors
+    // or other non-trivial fields
+    Stage = IS_INVALID;
+    CyclesLeft = UNKNOWN_CYCLES;
+    setOptimizableMove(false);
+    RCUTokenID = 0;
+    LSUTokenID = 0;
+    CriticalResourceMask = 0;
+    IsEliminated = false;
+  }
 
   unsigned getRCUTokenID() const { return RCUTokenID; }
   unsigned getLSUTokenID() const { return LSUTokenID; }
