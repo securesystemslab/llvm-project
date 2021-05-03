@@ -669,7 +669,7 @@ InstrBuilder::createInstruction(const MCInst &MCI) {
   bool IsInstRecycled = false;
 
   if (IsStaticDesc && InstRecycleCallback) {
-    if (auto *I = InstRecycleCallback(MCI)) {
+    if (auto *I = InstRecycleCallback(D)) {
       NewIS = I;
       NewIS->reset();
       IsInstRecycled = true;
@@ -716,8 +716,7 @@ InstrBuilder::createInstruction(const MCInst &MCI) {
 
     // Okay, this is a register operand. Create a ReadState for it.
     ReadState *RS = nullptr;
-    if (IsInstRecycled) {
-      assert(Idx < NewIS->getUses().size());
+    if (IsInstRecycled && Idx < NewIS->getUses().size()) {
       NewIS->getUses()[Idx] = ReadState(RD, RegID);
       RS = &NewIS->getUses()[Idx];
     } else {
@@ -776,8 +775,7 @@ InstrBuilder::createInstruction(const MCInst &MCI) {
     }
 
     assert(RegID && "Expected a valid register ID!");
-    if (IsInstRecycled) {
-      assert(Idx < NewIS->getDefs().size());
+    if (IsInstRecycled && Idx < NewIS->getDefs().size()) {
       NewIS->getDefs()[Idx] = WriteState(WD, RegID,
                                          /* ClearsSuperRegs */ WriteMask[WriteIndex],
                                          /* WritesZero */ IsZeroIdiom);

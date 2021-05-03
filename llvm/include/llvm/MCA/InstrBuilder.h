@@ -38,7 +38,7 @@ public:
   // Always need to carry an Instruction
   RecycledInstErr() = delete;
 
-  Instruction *getInst() { return RecycledInst; }
+  Instruction *getInst() const { return RecycledInst; }
 
   void log(raw_ostream &OS) const override {
     OS << "Instruction is recycled\n";
@@ -72,7 +72,7 @@ class InstrBuilder {
   bool FirstCallInst;
   bool FirstReturnInst;
 
-  llvm::function_ref<Instruction*(const MCInst&)> InstRecycleCallback;
+  llvm::function_ref<Instruction*(const InstrDesc&)> InstRecycleCallback;
 
   Expected<const InstrDesc &> createInstrDescImpl(const MCInst &MCI,
                                                   bool &Static);

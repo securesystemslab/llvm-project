@@ -660,6 +660,7 @@ public:
   bool updateDispatched();
   bool updatePending();
 
+  bool isInvalid() const { return Stage == IS_INVALID; }
   bool isDispatched() const { return Stage == IS_DISPATCHED; }
   bool isPending() const { return Stage == IS_PENDING; }
   bool isReady() const { return Stage == IS_READY; }

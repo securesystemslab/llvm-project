@@ -18,6 +18,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/MCA/Instruction.h"
+#include <vector>
 
 namespace llvm {
 namespace mca {
@@ -26,13 +27,7 @@ namespace mca {
 // prevent compiler error C2139 about intrinsic type trait '__is_assignable'.
 typedef std::pair<unsigned, const Instruction &> SourceRef;
 
-class SourceMgrBase {
-protected:
-  unsigned Current;
-
-  SourceMgrBase(): Current(0U) {}
-
-public:
+struct SourceMgrBase {
   using UniqueInst = std::unique_ptr<Instruction>;
 
   virtual unsigned size() const = 0;
@@ -43,32 +38,18 @@ public:
 
   virtual SourceRef peekNext() const = 0;
 
-  void updateNext() { ++Current; }
+  virtual void updateNext() = 0;
 };
 
-template<class StorageT>
-class SourceMgrImpl : public SourceMgrBase {
-protected:
-  StorageT Sequence;
-
-  SourceMgrImpl() = default;
-
-  SourceMgrImpl(StorageT S) : Sequence(S) {}
-
-public:
-  using const_iterator = typename StorageT::const_iterator;
-  const_iterator begin() const { return Sequence.begin(); }
-  const_iterator end() const { return Sequence.end(); }
-};
-
-class CircularSourceMgr
-  : public SourceMgrImpl<ArrayRef<SourceMgrBase::UniqueInst>> {
+class CircularSourceMgr : public SourceMgrBase {
+  ArrayRef<UniqueInst> Sequence;
+  unsigned Current;
   const unsigned Iterations;
   static const unsigned DefaultIterations = 100;
 
 public:
   CircularSourceMgr(ArrayRef<UniqueInst> S, unsigned Iter)
-      : SourceMgrImpl(S),
+      : Sequence(S), Current(0U),
         Iterations(Iter ? Iter : DefaultIterations) {}
 
   unsigned size() const override { return Sequence.size(); }
@@ -83,22 +64,43 @@ public:
     assert(hasNext() && "Already at end of sequence!");
     return SourceRef(Current, *Sequence[Current % Sequence.size()]);
   }
+
+  void updateNext() override { ++Current; }
+
+  using const_iterator = typename decltype(Sequence)::const_iterator;
+  const_iterator begin() const { return Sequence.begin(); }
+  const_iterator end() const { return Sequence.end(); }
 };
 
 /// Using CircularSourceMgr by default
 using SourceMgr = CircularSourceMgr;
 
-class IncrementalSourceMgr
-  : public SourceMgrImpl<SmallVector<SourceMgrBase::UniqueInst, 8>> {
+class IncrementalSourceMgr : public SourceMgrBase {
+  // Owner of all mca::Instruction
+  std::vector<UniqueInst> InstStorage;
+
+  SmallVector<Instruction*, 4> Staging;
+
+  // FIXME: What happen when this overflow?
+  unsigned TotalCounter;
+
   bool EOS;
 
-public:
-  IncrementalSourceMgr(): SourceMgrImpl(), EOS(false) {}
+  llvm::function_ref<void(Instruction*)> InstFreedCallback;
 
-  unsigned size() const override { return Sequence.size(); }
+public:
+  IncrementalSourceMgr(): TotalCounter(0U), EOS(false) {}
+
+  void setOnInstFreedCallback(decltype(InstFreedCallback) CB) {
+    InstFreedCallback = CB;
+  }
+
+  unsigned size() const override {
+    llvm_unreachable("Not applicable");
+  }
 
   bool hasNext() const override {
-    return Current < Sequence.size();
+    return !Staging.empty();
   }
   bool isEnd() const override {
     return EOS;
@@ -106,11 +108,28 @@ public:
 
   SourceRef peekNext() const override {
     assert(hasNext());
-    return SourceRef(Current, *Sequence[Current]);
+    return SourceRef(TotalCounter, *Staging.front());
   }
 
+  // Add a new instruction
   void addInst(UniqueInst &&Inst) {
-    Sequence.emplace_back(std::move(Inst));
+    InstStorage.emplace_back(std::move(Inst));
+    Staging.push_back(InstStorage.back().get());
+  }
+
+  // Recycle an instruction
+  void addRecycledInst(Instruction *Inst) {
+    Staging.push_back(Inst);
+  }
+
+  void updateNext() override {
+    ++TotalCounter;
+    Instruction *I = Staging.front();
+    I->reset();
+    Staging.erase(Staging.begin());
+
+    if (InstFreedCallback)
+      InstFreedCallback(I);
   }
 
   void endOfStream() { EOS = true; }
