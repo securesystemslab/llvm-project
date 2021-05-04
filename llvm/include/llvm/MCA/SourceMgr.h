@@ -16,9 +16,8 @@
 #define LLVM_MCA_SOURCEMGR_H
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/MCA/Instruction.h"
-#include <vector>
+#include <list>
 
 namespace llvm {
 namespace mca {
@@ -77,9 +76,9 @@ using SourceMgr = CircularSourceMgr;
 
 class IncrementalSourceMgr : public SourceMgrBase {
   // Owner of all mca::Instruction
-  std::vector<UniqueInst> InstStorage;
+  std::list<UniqueInst> InstStorage;
 
-  SmallVector<Instruction*, 4> Staging;
+  std::list<Instruction*> Staging;
 
   // FIXME: What happen when this overflow?
   unsigned TotalCounter;
