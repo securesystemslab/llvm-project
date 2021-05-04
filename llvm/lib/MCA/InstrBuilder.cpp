@@ -538,9 +538,6 @@ Error InstrBuilder::verifyInstrDesc(const InstrDesc &ID,
   return make_error<InstructionError<MCInst>>(std::string(Message), MCI);
 }
 
-STATISTIC(NumStaticInstrDescCreated, "Number of created static InstrDesc");
-STATISTIC(NumVariantInstrDescCreated, "Number of created variadic InstrDesc");
-
 Expected<const InstrDesc &>
 InstrBuilder::createInstrDescImpl(const MCInst &MCI, bool &StaticDesc) {
   assert(STI.getSchedModel().hasInstrSchedModel() &&
@@ -626,35 +623,30 @@ InstrBuilder::createInstrDescImpl(const MCInst &MCI, bool &StaticDesc) {
   bool IsVariadic = MCDesc.isVariadic();
   StaticDesc = !IsVariadic && !IsVariant;
   if (StaticDesc) {
-    ++NumStaticInstrDescCreated;
     Descriptors[MCI.getOpcode()] = std::move(ID);
     return *Descriptors[MCI.getOpcode()];
   }
 
-  ++NumVariantInstrDescCreated;
   VariantDescriptors[&MCI] = std::move(ID);
   return *VariantDescriptors[&MCI];
 }
 
-STATISTIC(NumStaticInstrDescCacheHit, "Number of static InstrDesc cache hit");
-STATISTIC(NumVariantInstrDescCacheHit, "Number of variadic InstrDesc cache hit");
-
 Expected<const InstrDesc &>
 InstrBuilder::getOrCreateInstrDesc(const MCInst &MCI, bool &StaticDesc) {
   if (Descriptors.find_as(MCI.getOpcode()) != Descriptors.end()) {
-    NumStaticInstrDescCacheHit++;
     StaticDesc = true;
     return *Descriptors[MCI.getOpcode()];
   }
 
   if (VariantDescriptors.find(&MCI) != VariantDescriptors.end()) {
-    NumVariantInstrDescCacheHit++;
     StaticDesc = false;
     return *VariantDescriptors[&MCI];
   }
 
   return createInstrDescImpl(MCI, StaticDesc);
 }
+
+STATISTIC(NumVariantInst, "Number of MCInsts that doesn't have static Desc");
 
 Expected<std::unique_ptr<Instruction>>
 InstrBuilder::createInstruction(const MCInst &MCI) {
@@ -667,6 +659,9 @@ InstrBuilder::createInstruction(const MCInst &MCI) {
   Instruction *NewIS = nullptr;
   std::unique_ptr<Instruction> CreatedIS;
   bool IsInstRecycled = false;
+
+  if (!IsStaticDesc)
+    ++NumVariantInst;
 
   if (IsStaticDesc && InstRecycleCallback) {
     if (auto *I = InstRecycleCallback(D)) {

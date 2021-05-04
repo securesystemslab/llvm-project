@@ -17,6 +17,9 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/MCA/Instruction.h"
+#ifndef NDEBUG
+#include "llvm/Support/Format.h"
+#endif
 #include <list>
 
 namespace llvm {
@@ -38,6 +41,8 @@ struct SourceMgrBase {
   virtual SourceRef peekNext() const = 0;
 
   virtual void updateNext() = 0;
+
+  virtual ~SourceMgrBase() {}
 };
 
 class CircularSourceMgr : public SourceMgrBase {
@@ -87,8 +92,12 @@ class IncrementalSourceMgr : public SourceMgrBase {
 
   llvm::function_ref<void(Instruction*)> InstFreedCallback;
 
+#ifndef NDEBUG
+  size_t MaxInstStorageSize = 0U;
+#endif
+
 public:
-  IncrementalSourceMgr(): TotalCounter(0U), EOS(false) {}
+  IncrementalSourceMgr() : TotalCounter(0U), EOS(false) {}
 
   void setOnInstFreedCallback(decltype(InstFreedCallback) CB) {
     InstFreedCallback = CB;
@@ -114,6 +123,9 @@ public:
   void addInst(UniqueInst &&Inst) {
     InstStorage.emplace_back(std::move(Inst));
     Staging.push_back(InstStorage.back().get());
+#ifndef NDEBUG
+    MaxInstStorageSize = InstStorage.size();
+#endif
   }
 
   // Recycle an instruction
@@ -132,6 +144,26 @@ public:
   }
 
   void endOfStream() { EOS = true; }
+
+#ifndef NDEBUG
+  void printStatistic(raw_ostream &OS) {
+    if (MaxInstStorageSize <= TotalCounter) {
+      auto Ratio = double(MaxInstStorageSize) / double(TotalCounter);
+      OS << "Cache ratio = "
+         << MaxInstStorageSize << " / " << TotalCounter
+         << llvm::format(" (%.2f%%)", (1.0 - Ratio) * 100.0)
+         << "\n";
+    } else {
+      OS << "Error: Number of created instructions "
+         << "are more than number of issued instructions\n";
+    }
+  }
+#else
+  void printStatistic(raw_ostream &OS) {
+    OS << "Statistic for IncrementalSourceMgr "
+       << "is only available in debug build\n";
+  }
+#endif
 };
 } // namespace mca
 } // namespace llvm
