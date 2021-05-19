@@ -20,7 +20,7 @@
 #include "llvm/Support/WithColor.h"
 #include "llvm/Support/raw_ostream.h"
 
-#define DEBUG_TYPE "llvm-mca"
+#define DEBUG_TYPE "llvm-mca-instrbuilder"
 
 namespace llvm {
 namespace mca {
@@ -691,8 +691,8 @@ InstrBuilder::createInstruction(const MCInst &MCI) {
 
   // Initialize Reads first.
   MCPhysReg RegID = 0;
-  for (size_t Idx = 0U, E = D.Reads.size(); Idx < E; ++Idx) {
-    const ReadDescriptor &RD = D.Reads[Idx];
+  size_t Idx = 0U;
+  for (const ReadDescriptor &RD : D.Reads) {
     if (!RD.isImplicitRead()) {
       // explicit read.
       const MCOperand &Op = MCI.getOperand(RD.OpIndex);
@@ -713,10 +713,11 @@ InstrBuilder::createInstruction(const MCInst &MCI) {
     ReadState *RS = nullptr;
     if (IsInstRecycled && Idx < NewIS->getUses().size()) {
       NewIS->getUses()[Idx] = ReadState(RD, RegID);
-      RS = &NewIS->getUses()[Idx];
+      RS = &NewIS->getUses()[Idx++];
     } else {
       NewIS->getUses().emplace_back(RD, RegID);
       RS = &NewIS->getUses().back();
+      ++Idx;
     }
 
     if (IsDepBreaking) {
@@ -739,6 +740,8 @@ InstrBuilder::createInstruction(const MCInst &MCI) {
       }
     }
   }
+  if (IsInstRecycled && Idx < NewIS->getUses().size())
+    NewIS->getUses().pop_back_n(NewIS->getUses().size() - Idx);
 
   // Early exit if there are no writes.
   if (D.Writes.empty()) {
@@ -759,8 +762,8 @@ InstrBuilder::createInstruction(const MCInst &MCI) {
 
   // Initialize writes.
   unsigned WriteIndex = 0;
-  for (size_t Idx = 0U, E = D.Writes.size(); Idx < E; ++Idx) {
-    const WriteDescriptor &WD = D.Writes[Idx];
+  Idx = 0U;
+  for (const WriteDescriptor &WD : D.Writes) {
     RegID = WD.isImplicitWrite() ? WD.RegisterID
                                  : MCI.getOperand(WD.OpIndex).getReg();
     // Check if this is a optional definition that references NoReg.
@@ -771,16 +774,19 @@ InstrBuilder::createInstruction(const MCInst &MCI) {
 
     assert(RegID && "Expected a valid register ID!");
     if (IsInstRecycled && Idx < NewIS->getDefs().size()) {
-      NewIS->getDefs()[Idx] = WriteState(WD, RegID,
-                                         /* ClearsSuperRegs */ WriteMask[WriteIndex],
-                                         /* WritesZero */ IsZeroIdiom);
+      NewIS->getDefs()[Idx++] = WriteState(WD, RegID,
+                                           /* ClearsSuperRegs */ WriteMask[WriteIndex],
+                                           /* WritesZero */ IsZeroIdiom);
     } else {
       NewIS->getDefs().emplace_back(WD, RegID,
                                     /* ClearsSuperRegs */ WriteMask[WriteIndex],
                                     /* WritesZero */ IsZeroIdiom);
+      ++Idx;
     }
     ++WriteIndex;
   }
+  if (IsInstRecycled && Idx < NewIS->getDefs().size())
+    NewIS->getDefs().pop_back_n(NewIS->getDefs().size() - Idx);
 
   if (IsInstRecycled)
     return llvm::make_error<RecycledInstErr>(NewIS);
