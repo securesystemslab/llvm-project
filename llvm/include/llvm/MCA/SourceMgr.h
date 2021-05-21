@@ -99,6 +99,16 @@ class IncrementalSourceMgr : public SourceMgrBase {
 public:
   IncrementalSourceMgr() : TotalCounter(0U), EOS(false) {}
 
+  void clear() {
+    Staging.clear();
+    InstStorage.clear();
+    TotalCounter = 0U;
+    EOS = false;
+#ifndef NDEBUG
+    MaxInstStorageSize = 0U;
+#endif
+  }
+
   void setOnInstFreedCallback(decltype(InstFreedCallback) CB) {
     InstFreedCallback = CB;
   }
