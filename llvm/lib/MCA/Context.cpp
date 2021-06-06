@@ -40,7 +40,8 @@ Context::createDefaultPipeline(const PipelineOptions &Opts, SourceMgrBase &SrcMg
   auto RCU = std::make_unique<RetireControlUnit>(SM);
   auto PRF = std::make_unique<RegisterFile>(SM, MRI, Opts.RegisterFileSize);
   auto LSU = std::make_unique<LSUnit>(SM, Opts.LoadQueueSize,
-                                      Opts.StoreQueueSize, Opts.AssumeNoAlias);
+                                       Opts.StoreQueueSize, Opts.AssumeNoAlias,
+                                       getMetadataRegistry());
   auto HWS = std::make_unique<Scheduler>(SM, *LSU);
 
   // Create the pipeline stages.

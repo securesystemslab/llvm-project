@@ -37,6 +37,9 @@ inline bool operator<(const MDMemoryAccess &LHS, const MDMemoryAccess &RHS) {
   return LHS.Addr < RHS.Addr &&
          uint64_t(LHS.Addr + LHS.Size) <= RHS.Addr;
 }
+#ifndef NDEBUG
+raw_ostream &operator<<(raw_ostream &OS, const MDMemoryAccess & MDA);
+#endif
 
 /// A node of a memory dependency graph. A MemoryGroup describes a set of
 /// instructions with same memory dependencies.
