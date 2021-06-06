@@ -20,9 +20,23 @@
 #include "llvm/MC/MCSchedule.h"
 #include "llvm/MCA/HardwareUnits/HardwareUnit.h"
 #include "llvm/MCA/Instruction.h"
+#include "llvm/MCA/MetadataRegistry.h"
+#include <set>
 
 namespace llvm {
 namespace mca {
+
+/// Metadata structure for memory access
+struct MDMemoryAccess {
+  bool IsStore;
+  uint64_t Addr;
+  unsigned Size;
+};
+
+inline bool operator<(const MDMemoryAccess &LHS, const MDMemoryAccess &RHS) {
+  return LHS.Addr < RHS.Addr &&
+         uint64_t(LHS.Addr + LHS.Size) <= RHS.Addr;
+}
 
 /// A node of a memory dependency graph. A MemoryGroup describes a set of
 /// instructions with same memory dependencies.
@@ -47,6 +61,8 @@ class MemoryGroup {
 
   CriticalDependency CriticalPredecessor;
   InstRef CriticalMemoryInstruction;
+
+  std::multiset<MDMemoryAccess> MDMemAccesses;
 
   MemoryGroup(const MemoryGroup &) = delete;
   MemoryGroup &operator=(const MemoryGroup &) = delete;
@@ -111,6 +127,14 @@ public:
     return NumExecuting && (NumExecuting == (NumInstructions - NumExecuted));
   }
   bool isExecuted() const { return NumInstructions == NumExecuted; }
+
+  void addMemAccess(const Optional<MDMemoryAccess> &MaybeMDA) {
+    if (MaybeMDA)
+      MDMemAccesses.insert(*MaybeMDA);
+  }
+  bool isMemAccessAlias(const MDMemoryAccess &MDA) const {
+    return MDMemAccesses.count(MDA);
+  }
 
   void onGroupIssued(const InstRef &IR, bool ShouldUpdateCriticalDep) {
     assert(!isReady() && "Unexpected group-start event!");
@@ -221,9 +245,13 @@ class LSUnitBase : public HardwareUnit {
   DenseMap<unsigned, std::unique_ptr<MemoryGroup>> Groups;
   unsigned NextGroupID;
 
+protected:
+  MetadataRegistry *MDRegistry;
+
 public:
   LSUnitBase(const MCSchedModel &SM, unsigned LoadQueueSize,
-             unsigned StoreQueueSize, bool AssumeNoAlias);
+             unsigned StoreQueueSize, bool AssumeNoAlias,
+             MetadataRegistry *MDR);
 
   virtual ~LSUnitBase();
 
@@ -241,6 +269,9 @@ public:
   void releaseSQSlot() { --UsedSQEntries; }
 
   bool assumeNoAlias() const { return NoAlias; }
+  bool noAlias(unsigned GID, const Optional<MDMemoryAccess> &MDA) const;
+
+  Optional<MDMemoryAccess> getMemoryAccessMD(const InstRef &IR) const;
 
   enum Status {
     LSU_AVAILABLE = 0,
@@ -444,11 +475,13 @@ class LSUnit : public LSUnitBase {
 
 public:
   LSUnit(const MCSchedModel &SM)
-      : LSUnit(SM, /* LQSize */ 0, /* SQSize */ 0, /* NoAlias */ false) {}
+      : LSUnit(SM, /* LQSize */ 0, /* SQSize */ 0, /* NoAlias */ false,
+               /* MDRegistry */ nullptr) {}
   LSUnit(const MCSchedModel &SM, unsigned LQ, unsigned SQ)
-      : LSUnit(SM, LQ, SQ, /* NoAlias */ false) {}
-  LSUnit(const MCSchedModel &SM, unsigned LQ, unsigned SQ, bool AssumeNoAlias)
-      : LSUnitBase(SM, LQ, SQ, AssumeNoAlias), CurrentLoadGroupID(0),
+      : LSUnit(SM, LQ, SQ, /* NoAlias */ false, /* MDRegistry */ nullptr) {}
+  LSUnit(const MCSchedModel &SM, unsigned LQ, unsigned SQ, bool AssumeNoAlias,
+         MetadataRegistry *MDR = nullptr)
+      : LSUnitBase(SM, LQ, SQ, AssumeNoAlias, MDR), CurrentLoadGroupID(0),
         CurrentLoadBarrierGroupID(0), CurrentStoreGroupID(0),
         CurrentStoreBarrierGroupID(0) {}
 

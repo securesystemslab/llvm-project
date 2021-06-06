@@ -21,6 +21,7 @@
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MCA/CustomBehaviour.h"
 #include "llvm/MCA/HardwareUnits/HardwareUnit.h"
+#include "llvm/MCA/MetadataRegistry.h"
 #include "llvm/MCA/Pipeline.h"
 #include "llvm/MCA/SourceMgr.h"
 #include <memory>
@@ -50,6 +51,7 @@ struct PipelineOptions {
 
 class Context {
   SmallVector<std::unique_ptr<HardwareUnit>, 4> Hardware;
+  std::unique_ptr<MetadataRegistry> MDRegistry;
   const MCRegisterInfo &MRI;
   const MCSubtargetInfo &STI;
 
@@ -63,6 +65,14 @@ public:
 
   void addHardwareUnit(std::unique_ptr<HardwareUnit> H) {
     Hardware.push_back(std::move(H));
+  }
+
+  MetadataRegistry &createMetadataRegistry() {
+    MDRegistry = std::make_unique<MetadataRegistry>();
+    return *MDRegistry;
+  }
+  MetadataRegistry *getMetadataRegistry() {
+    return MDRegistry.get();
   }
 
   /// Construct a basic pipeline for simulating an out-of-order pipeline.

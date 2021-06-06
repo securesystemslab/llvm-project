@@ -592,6 +592,9 @@ class Instruction : public InstructionBase {
   // operation.
   unsigned LSUTokenID;
 
+  // Metadata token/index.
+  Optional<unsigned> MDToken;
+
   // A resource mask which identifies buffered resources consumed by this
   // instruction at dispatch stage. In the absence of macro-fusion, this value
   // should always match the value of field `UsedBuffers` from the instruction
@@ -616,6 +619,7 @@ public:
   Instruction(const InstrDesc &D, const unsigned Opcode)
       : InstructionBase(D, Opcode), Stage(IS_INVALID),
         CyclesLeft(UNKNOWN_CYCLES), RCUTokenID(0), LSUTokenID(0),
+        MDToken(llvm::None),
         UsedBuffers(D.UsedBuffers), CriticalRegDep(), CriticalMemDep(),
         CriticalResourceMask(0), IsEliminated(false) {}
 
@@ -627,6 +631,7 @@ public:
     setOptimizableMove(false);
     RCUTokenID = 0;
     LSUTokenID = 0;
+    MDToken = llvm::None;
     CriticalResourceMask = 0;
     IsEliminated = false;
   }
@@ -634,6 +639,11 @@ public:
   unsigned getRCUTokenID() const { return RCUTokenID; }
   unsigned getLSUTokenID() const { return LSUTokenID; }
   void setLSUTokenID(unsigned LSUTok) { LSUTokenID = LSUTok; }
+
+  Optional<unsigned> getMetadataToken() const { return MDToken; }
+  void setMetadataToken(unsigned Tok) {
+    MDToken = Tok;
+  }
 
   uint64_t getUsedBuffers() const { return UsedBuffers; }
   void setUsedBuffers(uint64_t Mask) { UsedBuffers = Mask; }

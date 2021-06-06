@@ -13,6 +13,7 @@
 
 #include "llvm/MCA/HardwareUnits/LSUnit.h"
 #include "llvm/MCA/Instruction.h"
+#include "llvm/MCA/MetadataCategories.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -22,9 +23,10 @@ namespace llvm {
 namespace mca {
 
 LSUnitBase::LSUnitBase(const MCSchedModel &SM, unsigned LQ, unsigned SQ,
-                       bool AssumeNoAlias)
+                       bool AssumeNoAlias, MetadataRegistry *MDR)
     : LQSize(LQ), SQSize(SQ), UsedLQEntries(0), UsedSQEntries(0),
-      NoAlias(AssumeNoAlias), NextGroupID(1) {
+      NoAlias(AssumeNoAlias), NextGroupID(1),
+      MDRegistry(MDR) {
   if (SM.hasExtraProcessorInfo()) {
     const MCExtraProcessorInfo &EPI = SM.getExtraProcessorInfo();
     if (!LQSize && EPI.LoadQueueID) {
@@ -37,6 +39,25 @@ LSUnitBase::LSUnitBase(const MCSchedModel &SM, unsigned LQ, unsigned SQ,
       SQSize = std::max(0, StQDesc.BufferSize);
     }
   }
+}
+
+Optional<MDMemoryAccess>
+LSUnitBase::getMemoryAccessMD(const InstRef &IR) const {
+  if (MDRegistry && IR.getInstruction()->getMetadataToken()) {
+    auto &Registry = (*MDRegistry)[MD_LSUnit_MemAccess];
+    unsigned MDTok = *IR.getInstruction()->getMetadataToken();
+    return Registry.get<MDMemoryAccess>(MDTok);
+  }
+  return llvm::None;
+}
+
+bool LSUnitBase::noAlias(unsigned GID,
+                         const Optional<MDMemoryAccess> &MDA) const {
+  if (MDA) {
+    const MemoryGroup &MG = getGroup(GID);
+    return !MG.isMemAccessAlias(*MDA);
+  } else
+    return assumeNoAlias();
 }
 
 LSUnitBase::~LSUnitBase() {}
@@ -68,6 +89,7 @@ void LSUnitBase::dump() const {
 
 unsigned LSUnit::dispatch(const InstRef &IR) {
   const InstrDesc &Desc = IR.getInstruction()->getDesc();
+  auto MaybeMDA = getMemoryAccessMD(IR);
   unsigned IsMemBarrier = Desc.HasSideEffects;
   assert((Desc.MayLoad || Desc.MayStore) && "Not a memory operation!");
 
@@ -80,6 +102,7 @@ unsigned LSUnit::dispatch(const InstRef &IR) {
     unsigned NewGID = createMemoryGroup();
     MemoryGroup &NewGroup = getGroup(NewGID);
     NewGroup.addInstruction();
+    NewGroup.addMemAccess(MaybeMDA);
 
     // A store may not pass a previous load or load barrier.
     unsigned ImmediateLoadDominator =
@@ -88,7 +111,7 @@ unsigned LSUnit::dispatch(const InstRef &IR) {
       MemoryGroup &IDom = getGroup(ImmediateLoadDominator);
       LLVM_DEBUG(dbgs() << "[LSUnit]: GROUP DEP: (" << ImmediateLoadDominator
                         << ") --> (" << NewGID << ")\n");
-      IDom.addSuccessor(&NewGroup, !assumeNoAlias());
+      IDom.addSuccessor(&NewGroup, !noAlias(ImmediateLoadDominator, MaybeMDA));
     }
 
     // A store may not pass a previous store barrier.
@@ -106,7 +129,8 @@ unsigned LSUnit::dispatch(const InstRef &IR) {
       MemoryGroup &StoreGroup = getGroup(CurrentStoreGroupID);
       LLVM_DEBUG(dbgs() << "[LSUnit]: GROUP DEP: (" << CurrentStoreGroupID
                         << ") --> (" << NewGID << ")\n");
-      StoreGroup.addSuccessor(&NewGroup, !assumeNoAlias());
+      StoreGroup.addSuccessor(&NewGroup, !noAlias(CurrentStoreGroupID,
+                                                  MaybeMDA));
     }
 
 
@@ -150,10 +174,11 @@ unsigned LSUnit::dispatch(const InstRef &IR) {
     unsigned NewGID = createMemoryGroup();
     MemoryGroup &NewGroup = getGroup(NewGID);
     NewGroup.addInstruction();
+    NewGroup.addMemAccess(MaybeMDA);
 
     // A load may not pass a previous store or store barrier
     // unless flag 'NoAlias' is set.
-    if (!assumeNoAlias() && CurrentStoreGroupID) {
+    if (!noAlias(CurrentStoreGroupID, MaybeMDA) && CurrentStoreGroupID) {
       MemoryGroup &StoreGroup = getGroup(CurrentStoreGroupID);
       LLVM_DEBUG(dbgs() << "[LSUnit]: GROUP DEP: (" << CurrentStoreGroupID
                         << ") --> (" << NewGID << ")\n");
@@ -189,6 +214,7 @@ unsigned LSUnit::dispatch(const InstRef &IR) {
   // A load may pass a previous load.
   MemoryGroup &Group = getGroup(CurrentLoadGroupID);
   Group.addInstruction();
+  Group.addMemAccess(MaybeMDA);
   return CurrentLoadGroupID;
 }
 
