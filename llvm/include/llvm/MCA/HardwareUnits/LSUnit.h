@@ -276,6 +276,14 @@ public:
 
   Optional<MDMemoryAccess> getMemoryAccessMD(const InstRef &IR) const;
 
+  bool isStore(const InstrDesc &Desc,
+               const Optional<MDMemoryAccess> &MDA) const {
+    if (MDA)
+      return MDA->IsStore;
+    else
+      return Desc.MayStore;
+  }
+
   enum Status {
     LSU_AVAILABLE = 0,
     LSU_LQUEUE_FULL, // Load Queue unavailable

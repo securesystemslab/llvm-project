@@ -12,6 +12,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "llvm/MCA/MetadataRegistry.h"
 #include "llvm/MCA/Stages/EntryStage.h"
 #include "llvm/MCA/Instruction.h"
 
@@ -76,6 +77,13 @@ llvm::Error EntryStage::cycleEnd() {
   NumRetired = std::distance(Instructions.begin(), It);
   // Erase instructions up to the first that hasn't been retired.
   if ((NumRetired * 2) >= Instructions.size()) {
+    if (MDRegistry) {
+      // Release all metdata entries
+      for (auto ItBegin = Instructions.begin(), ItEnd = It;
+           ItBegin != ItEnd; ++ItBegin)
+        if (auto MDTok = (*ItBegin)->getMetadataToken())
+          MDRegistry->erase(*MDTok);
+    }
     Instructions.erase(Instructions.begin(), It);
     NumRetired = 0;
   }

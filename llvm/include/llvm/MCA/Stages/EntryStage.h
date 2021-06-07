@@ -22,12 +22,14 @@
 
 namespace llvm {
 namespace mca {
+class MetadataRegistry;
 
 class EntryStage final : public Stage {
   InstRef CurrentInstruction;
   SmallVector<std::unique_ptr<Instruction>, 16> Instructions;
   SourceMgrBase &SM;
   unsigned NumRetired;
+  MetadataRegistry *MDRegistry;
 
   // Updates the program counter, and sets 'CurrentInstruction'.
   Error getNextInstruction();
@@ -36,7 +38,8 @@ class EntryStage final : public Stage {
   EntryStage &operator=(const EntryStage &Other) = delete;
 
 public:
-  EntryStage(SourceMgrBase &SM) : CurrentInstruction(), SM(SM), NumRetired(0) { }
+  EntryStage(SourceMgrBase &SM, MetadataRegistry *MDR = nullptr)
+    : CurrentInstruction(), SM(SM), NumRetired(0), MDRegistry(MDR) { }
 
   bool isAvailable(const InstRef &IR) const override;
   bool hasWorkToComplete() const override;

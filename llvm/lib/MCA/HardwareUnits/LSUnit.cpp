@@ -116,10 +116,10 @@ unsigned LSUnit::dispatch(const InstRef &IR) {
 
   if (Desc.MayLoad)
     acquireLQSlot();
-  if (Desc.MayStore)
+  if (isStore(Desc, MaybeMDA))
     acquireSQSlot();
 
-  if (Desc.MayStore) {
+  if (isStore(Desc, MaybeMDA)) {
     unsigned NewGID = createMemoryGroup();
     MemoryGroup &NewGroup = getGroup(NewGID);
     NewGroup.addInstruction();
@@ -253,9 +253,10 @@ unsigned LSUnit::dispatch(const InstRef &IR) {
 
 LSUnit::Status LSUnit::isAvailable(const InstRef &IR) const {
   const InstrDesc &Desc = IR.getInstruction()->getDesc();
+  auto MaybeMDA = getMemoryAccessMD(IR);
   if (Desc.MayLoad && isLQFull())
     return LSUnit::LSU_LQUEUE_FULL;
-  if (Desc.MayStore && isSQFull())
+  if (isStore(Desc, MaybeMDA) && isSQFull())
     return LSUnit::LSU_SQUEUE_FULL;
   return LSUnit::LSU_AVAILABLE;
 }
@@ -271,8 +272,9 @@ void LSUnitBase::onInstructionExecuted(const InstRef &IR) {
 
 void LSUnitBase::onInstructionRetired(const InstRef &IR) {
   const InstrDesc &Desc = IR.getInstruction()->getDesc();
+  auto MaybeMDA = getMemoryAccessMD(IR);
   bool IsALoad = Desc.MayLoad;
-  bool IsAStore = Desc.MayStore;
+  bool IsAStore = isStore(Desc, MaybeMDA);
   assert((IsALoad || IsAStore) && "Expected a memory operation!");
 
   if (IsALoad) {

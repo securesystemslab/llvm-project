@@ -45,9 +45,9 @@ Context::createDefaultPipeline(const PipelineOptions &Opts, SourceMgrBase &SrcMg
   auto HWS = std::make_unique<Scheduler>(SM, *LSU);
 
   // Create the pipeline stages.
-  auto Fetch = std::make_unique<EntryStage>(SrcMgr);
-  auto Dispatch =
-      std::make_unique<DispatchStage>(STI, MRI, Opts.DispatchWidth, *RCU, *PRF);
+  auto Fetch = std::make_unique<EntryStage>(SrcMgr, getMetadataRegistry());
+  auto Dispatch = std::make_unique<DispatchStage>(STI, MRI, Opts.DispatchWidth,
+                                                   *RCU, *PRF);
   auto Execute =
       std::make_unique<ExecuteStage>(*HWS, Opts.EnableBottleneckAnalysis);
   auto Retire = std::make_unique<RetireStage>(*RCU, *PRF, *LSU);
