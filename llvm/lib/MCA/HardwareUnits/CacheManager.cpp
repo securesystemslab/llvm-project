@@ -22,8 +22,9 @@ CacheUnit::CacheUnit(const CacheUnit::Config &C)
   : Size(C.Size), Assoc(C.Associate), LineSize(C.LineSize),
     NumSets((Size / LineSize) / Assoc),
     NumLineSizeBits(llvm::Log2_32_Ceil(LineSize)),
-    TagShift(NumLineSizeBits + llvm::Log2_32_Ceil(NumSets)),
-    Tags(size_t(NumSets * Assoc), 0U) {}
+    Tags(size_t(NumSets * Assoc), 0U),
+    PenaltyCycles(Optional<unsigned>::create(C.CacheMissPenalty?
+                                             &C.CacheMissPenalty : nullptr)) {}
 
 CacheManager::~CacheManager() {}
 
@@ -84,6 +85,8 @@ CacheManager::CacheManager(StringRef CacheConfigFile,
       C.Associate = *MaybeAssociate;
     if (auto MaybeLineSize = Entry.getInteger("line_size"))
       C.LineSize = *MaybeLineSize;
+    if (auto MaybeCacheMissPenalty = Entry.getInteger("penalty"))
+      C.CacheMissPenalty = *MaybeCacheMissPenalty;
   };
 
   // Parse L1D entry
@@ -94,6 +97,20 @@ CacheManager::CacheManager(StringRef CacheConfigFile,
     populateCacheInfo(*L2DEntry, L2DConfig);
 
   // The `Defer` RAII object will configure the cache objects upon exit
+}
+
+unsigned CacheManager::getPenaltyCycles(CacheAccessStatus CAS) {
+  unsigned Cycles = 0U;
+  if (CAS & CAS_L1D_Miss) {
+    if (auto MaybePenalty = L1DCache->PenaltyCycles)
+      Cycles += *MaybePenalty;
+  }
+  if (CAS & CAS_L2D_Miss) {
+    if (auto MaybePenalty = L2DCache->PenaltyCycles)
+      Cycles += *MaybePenalty;
+  }
+
+  return Cycles;
 }
 
 Optional<MDMemoryAccess> CacheManager::getMemoryAccessMD(const InstRef &IR) {
@@ -158,7 +175,7 @@ static bool onCacheRef(const MDMemoryAccess &MDA, CacheUnit &Cache) {
 }
 
 CacheManager::CacheAccessStatus
-CacheManager::onInstructionExecuted(const InstRef &IR) {
+CacheManager::onInstructionIssued(const InstRef &IR) {
   CacheAccessStatus CAS = CAS_L1D_Hit;
   if (auto MaybeMDA = getMemoryAccessMD(IR)) {
     ++NumDCacheAccesses;

@@ -649,6 +649,7 @@ public:
   void setUsedBuffers(uint64_t Mask) { UsedBuffers = Mask; }
   void clearUsedBuffers() { UsedBuffers = 0ULL; }
 
+  void addPenaltyCycles(unsigned Penalty) { CyclesLeft += Penalty; }
   int getCyclesLeft() const { return CyclesLeft; }
 
   // Transition to the dispatch stage, and assign a RCUToken to this

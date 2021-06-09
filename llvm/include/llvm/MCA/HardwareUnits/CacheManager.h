@@ -24,9 +24,9 @@ struct CacheUnit {
   // the line size
   unsigned NumLineSizeBits;
 
-  unsigned TagShift;
-
   SmallVector<uint64_t, 4> Tags;
+
+  Optional<unsigned> PenaltyCycles;
 
   // FIXME: Note that we really should use the cache
   // info provided by `TargetTransformInfo`. But in order
@@ -37,11 +37,13 @@ struct CacheUnit {
     unsigned Associate;
     unsigned Size;
     unsigned LineSize;
+    unsigned CacheMissPenalty;
 
     Config()
-      : Associate(1U),    // Direct mapped
-        Size(4U * 1024U), // 4KB
-        LineSize(64U)     // 64 bytes
+      : Associate(1U),        // Direct mapped
+        Size(4U * 1024U),     // 4KB
+        LineSize(64U),        // 64 bytes
+        CacheMissPenalty(0U)  // Number of penalty cycles when cache miss
         {}
   };
 
@@ -66,7 +68,11 @@ public:
                MetadataRegistry &MDR);
 
   /// Return true if there is a cache miss
-  CacheAccessStatus onInstructionExecuted(const InstRef &IR);
+  CacheAccessStatus onInstructionIssued(const InstRef &IR);
+
+  /// Return the number of penalty cycles for a specific kind of
+  /// cache miss. Or 0 if this info is not available
+  unsigned getPenaltyCycles(CacheAccessStatus CAS);
 
   virtual ~CacheManager();
 };
