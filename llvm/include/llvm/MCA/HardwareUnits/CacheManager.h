@@ -71,7 +71,7 @@ public:
   CacheAccessStatus onInstructionIssued(const InstRef &IR);
 
   /// Return the number of penalty cycles for a specific kind of
-  /// cache miss. Or 0 if this info is not available
+  /// cache miss.
   unsigned getPenaltyCycles(CacheAccessStatus CAS);
 
   virtual ~CacheManager();

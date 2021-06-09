@@ -121,14 +121,20 @@ Optional<MDMemoryAccess> CacheManager::getMemoryAccessMD(const InstRef &IR) {
   return llvm::None;
 }
 
-static bool onCacheSetRef(CacheUnit &Cache, uint32_t SetIdx, uint64_t Tag) {
+static bool cacheSetRef(CacheUnit &Cache, uint32_t SetIdx, uint64_t Tag) {
   const unsigned TagIdx = SetIdx * Cache.Assoc;
   auto getSet = [&](unsigned Idx) -> uint64_t& {
     assert(TagIdx + Idx < Cache.Tags.size());
     return Cache.Tags[TagIdx + Idx];
   };
 
-  for (int i = 0; i < int(Cache.Assoc); ++i) {
+  // The first item is the MRU
+  if (Tag == getSet(0))
+    return false;
+
+  // If it's a tag other than MRU, set it as MRU and move reset
+  // of the items down for one slot.
+  for (int i = 1; i < int(Cache.Assoc); ++i) {
     if (Tag == getSet(i)) {
       for (int j = i; j > 0; --j)
         getSet(j) = getSet(j - 1);
@@ -138,6 +144,8 @@ static bool onCacheSetRef(CacheUnit &Cache, uint32_t SetIdx, uint64_t Tag) {
     }
   }
 
+  // Now this is a miss, so set it as MRU and move reset of the
+  // items down for one slot.
   for (int j = Cache.Assoc - 1; j > 0; --j)
     getSet(j) = getSet(j - 1);
 
@@ -150,28 +158,33 @@ static bool onCacheRef(const MDMemoryAccess &MDA, CacheUnit &Cache) {
   const uint64_t Addr = MDA.Addr;
   const unsigned Size = MDA.Size;
 
-  const uint64_t Block1 = Addr >> Cache.NumLineSizeBits,
-                 Block2 = (Addr + Size - 1) >> Cache.NumLineSizeBits;
-  const uint32_t Set1 = uint32_t(Block1 & (Cache.NumSets - 1));
+  // A block has the size of a cache line.
+  // First, calculate the range of affected blocks.
+  const uint64_t FirstBlock = Addr >> Cache.NumLineSizeBits,
+                 LastBlock = (Addr + Size - 1) >> Cache.NumLineSizeBits;
+  const uint32_t FirstSet = uint32_t(FirstBlock & (Cache.NumSets - 1));
 
-  const uint64_t Tag1 = Block1;
+  // Usually real hardware will use
+  // tag = block >> log2(# of sets)
+  // as the tag, but using the entire block index is also fine.
+  const uint64_t FirstTag = FirstBlock;
 
-  if (Block1 == Block2)
-    return onCacheSetRef(Cache, Set1, Tag1);
+  // Access within a single cache line
+  if (FirstBlock == LastBlock)
+    return cacheSetRef(Cache, FirstSet, FirstTag);
 
-  if (Block1 + 1 == Block2) {
-    const uint32_t Set2 = uint32_t(Block2 & (Cache.NumSets - 1));
-    const uint64_t Tag2 = Block2;
-    if (onCacheSetRef(Cache, Set1, Tag1)) {
-      onCacheSetRef(Cache, Set2, Tag2);
+  // Access across two cache lines
+  if (FirstBlock + 1 == LastBlock) {
+    const uint32_t LastSet = uint32_t(LastBlock & (Cache.NumSets - 1));
+    const uint64_t LastTag = LastBlock;
+    if (cacheSetRef(Cache, FirstSet, FirstTag)) {
+      cacheSetRef(Cache, LastSet, LastTag);
       return true;
     }
-    return onCacheSetRef(Cache, Set2, Tag2);
+    return cacheSetRef(Cache, LastSet, LastTag);
   }
 
-  WithColor::warning() << "Cache access straddles across two cache sets\n";
-
-  return true;
+  llvm_unreachable("Cache access straddles across two cache sets\n");
 }
 
 CacheManager::CacheAccessStatus
@@ -180,7 +193,7 @@ CacheManager::onInstructionIssued(const InstRef &IR) {
   if (auto MaybeMDA = getMemoryAccessMD(IR)) {
     ++NumDCacheAccesses;
     if (onCacheRef(*MaybeMDA, *L1DCache)) {
-      CAS = CAS_L1D_Miss;
+      CAS |= CAS_L1D_Miss;
       ++NumL1DCacheMisses;
       if (onCacheRef(*MaybeMDA, *L2DCache)) {
         ++NumL2DCacheMisses;
