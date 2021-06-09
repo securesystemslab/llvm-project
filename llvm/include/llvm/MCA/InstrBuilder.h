@@ -74,6 +74,9 @@ class InstrBuilder {
 
   llvm::function_ref<Instruction*(const InstrDesc&)> InstRecycleCallback;
 
+  // Using `MCSchedModel::LoadLatency` for load instructions.
+  bool UseLoadLatency;
+
   Expected<const InstrDesc &> createInstrDescImpl(const MCInst &MCI,
                                                   bool &Static);
   Expected<const InstrDesc &> getOrCreateInstrDesc(const MCInst &MCI,
@@ -99,6 +102,10 @@ public:
 
   void setInstRecycleCallback(decltype(InstRecycleCallback) CB) {
     InstRecycleCallback = CB;
+  }
+
+  void useLoadLatency(bool Enable = true) {
+    UseLoadLatency = Enable;
   }
 
   Expected<std::unique_ptr<Instruction>> createInstruction(const MCInst &MCI);
