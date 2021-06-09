@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/MCA/Context.h"
+#include "llvm/MCA/HardwareUnits/CacheManager.h"
 #include "llvm/MCA/HardwareUnits/RegisterFile.h"
 #include "llvm/MCA/HardwareUnits/RetireControlUnit.h"
 #include "llvm/MCA/HardwareUnits/Scheduler.h"
@@ -30,7 +31,8 @@ namespace mca {
 
 std::unique_ptr<Pipeline>
 Context::createDefaultPipeline(const PipelineOptions &Opts, SourceMgrBase &SrcMgr,
-                               CustomBehaviour &CB) {
+                               CustomBehaviour &CB,
+                               StringRef CacheConfigFile) {
   const MCSchedModel &SM = STI.getSchedModel();
 
   if (!SM.isOutOfOrder())
@@ -42,7 +44,11 @@ Context::createDefaultPipeline(const PipelineOptions &Opts, SourceMgrBase &SrcMg
   auto LSU = std::make_unique<LSUnit>(SM, Opts.LoadQueueSize,
                                        Opts.StoreQueueSize, Opts.AssumeNoAlias,
                                        getMetadataRegistry());
-  auto HWS = std::make_unique<Scheduler>(SM, *LSU);
+  std::unique_ptr<CacheManager> HWC;
+  if (CacheConfigFile.size() && getMetadataRegistry())
+    HWC = std::make_unique<CacheManager>(CacheConfigFile,
+                                         *getMetadataRegistry());
+  auto HWS = std::make_unique<Scheduler>(SM, *LSU, HWC.get());
 
   // Create the pipeline stages.
   auto Fetch = std::make_unique<EntryStage>(SrcMgr, getMetadataRegistry());
@@ -56,6 +62,8 @@ Context::createDefaultPipeline(const PipelineOptions &Opts, SourceMgrBase &SrcMg
   addHardwareUnit(std::move(RCU));
   addHardwareUnit(std::move(PRF));
   addHardwareUnit(std::move(LSU));
+  if (HWC)
+    addHardwareUnit(std::move(HWC));
   addHardwareUnit(std::move(HWS));
 
   // Build the pipeline.

@@ -23,6 +23,7 @@
 
 namespace llvm {
 namespace mca {
+class CacheManager;
 
 class SchedulerStrategy {
 public:
@@ -69,6 +70,7 @@ public:
 ///
 class Scheduler : public HardwareUnit {
   LSUnitBase &LSU;
+  CacheManager *HWCache;
 
   // Instruction selection strategy for this Scheduler.
   std::unique_ptr<SchedulerStrategy> Strategy;
@@ -154,17 +156,22 @@ class Scheduler : public HardwareUnit {
   bool promoteToPendingSet(SmallVectorImpl<InstRef> &Pending);
 
 public:
-  Scheduler(const MCSchedModel &Model, LSUnitBase &Lsu)
-      : Scheduler(Model, Lsu, nullptr) {}
+  Scheduler(const MCSchedModel &Model, LSUnitBase &Lsu,
+            CacheManager *HWCache = nullptr)
+      : Scheduler(Model, Lsu, nullptr, HWCache) {}
 
   Scheduler(const MCSchedModel &Model, LSUnitBase &Lsu,
-            std::unique_ptr<SchedulerStrategy> SelectStrategy)
+            std::unique_ptr<SchedulerStrategy> SelectStrategy,
+            CacheManager *HWCache = nullptr)
       : Scheduler(std::make_unique<ResourceManager>(Model), Lsu,
-                  std::move(SelectStrategy)) {}
+                  std::move(SelectStrategy),
+                  HWCache) {}
 
   Scheduler(std::unique_ptr<ResourceManager> RM, LSUnitBase &Lsu,
-            std::unique_ptr<SchedulerStrategy> SelectStrategy)
-      : LSU(Lsu), Resources(std::move(RM)), BusyResourceUnits(0),
+            std::unique_ptr<SchedulerStrategy> SelectStrategy,
+            CacheManager *HWCache = nullptr)
+      : LSU(Lsu), HWCache(HWCache),
+        Resources(std::move(RM)), BusyResourceUnits(0),
         NumDispatchedToThePendingSet(0), HadTokenStall(false) {
     initializeStrategy(std::move(SelectStrategy));
   }

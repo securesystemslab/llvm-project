@@ -4,6 +4,7 @@ add_llvm_component_library(LLVMMCA
   CustomBehaviour.cpp
   HWEventListener.cpp
   HardwareUnits/HardwareUnit.cpp
+  HardwareUnits/CacheManager.cpp
   HardwareUnits/LSUnit.cpp
   HardwareUnits/RegisterFile.cpp
   HardwareUnits/ResourceManager.cpp

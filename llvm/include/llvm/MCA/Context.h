@@ -17,6 +17,7 @@
 #ifndef LLVM_MCA_CONTEXT_H
 #define LLVM_MCA_CONTEXT_H
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MCA/CustomBehaviour.h"
@@ -79,7 +80,8 @@ public:
   /// This pipeline consists of Fetch, Dispatch, Execute, and Retire stages.
   std::unique_ptr<Pipeline> createDefaultPipeline(const PipelineOptions &Opts,
                                                   SourceMgrBase &SrcMgr,
-                                                  CustomBehaviour &CB);
+                                                  CustomBehaviour &CB,
+                                                  StringRef CacheConfigFile = "");
 
   /// Construct a basic pipeline for simulating an in-order pipeline.
   /// This pipeline consists of Fetch, InOrderIssue, and Retire stages.

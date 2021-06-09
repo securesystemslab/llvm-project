@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/MCA/HardwareUnits/CacheManager.h"
 #include "llvm/MCA/HardwareUnits/Scheduler.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -87,6 +88,8 @@ void Scheduler::issueInstructionImpl(
     LSU.onInstructionIssued(IR);
     const MemoryGroup &Group = LSU.getGroup(IS->getLSUTokenID());
     IS->setCriticalMemDep(Group.getCriticalPredecessor());
+    if (HWCache)
+      (void) HWCache->onInstructionExecuted(IR);
   }
 
   if (IS->isExecuting())
