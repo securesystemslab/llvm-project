@@ -99,15 +99,15 @@ CacheManager::CacheManager(StringRef CacheConfigFile,
   // The `Defer` RAII object will configure the cache objects upon exit
 }
 
-unsigned CacheManager::getPenaltyCycles(CacheAccessStatus CAS) {
+unsigned CacheManager::getPenaltyCycles(const CacheAccessStatus &CAS) {
   unsigned Cycles = 0U;
-  if (CAS & CAS_L1D_Miss) {
+  if (CAS.NumL1DMiss) {
     if (auto MaybePenalty = L1DCache->PenaltyCycles)
-      Cycles += *MaybePenalty;
+      Cycles += *MaybePenalty * CAS.NumL1DMiss;
   }
-  if (CAS & CAS_L2D_Miss) {
+  if (CAS.NumL2DMiss) {
     if (auto MaybePenalty = L2DCache->PenaltyCycles)
-      Cycles += *MaybePenalty;
+      Cycles += *MaybePenalty * CAS.NumL2DMiss;
   }
 
   return Cycles;
@@ -187,20 +187,29 @@ static bool onCacheRef(const MDMemoryAccess &MDA, CacheUnit &Cache) {
   llvm_unreachable("Cache access straddles across two cache sets\n");
 }
 
-CacheManager::CacheAccessStatus
-CacheManager::onInstructionIssued(const InstRef &IR) {
-  CacheAccessStatus CAS = CAS_L1D_Hit;
+void CacheManager::onInstructionIssued(const InstRef &IR,
+                                       CacheAccessStatus &CAS) {
   if (auto MaybeMDA = getMemoryAccessMD(IR)) {
-    ++NumDCacheAccesses;
-    if (onCacheRef(*MaybeMDA, *L1DCache)) {
-      CAS |= CAS_L1D_Miss;
-      ++NumL1DCacheMisses;
-      if (onCacheRef(*MaybeMDA, *L2DCache)) {
-        ++NumL2DCacheMisses;
-        CAS |= CAS_L2D_Miss;
+    const auto *MDA = &*MaybeMDA;
+    unsigned BMAIdx = 0U;
+    while (true) {
+      ++NumDCacheAccesses;
+      if (onCacheRef(*MDA, *L1DCache)) {
+        ++CAS.NumL1DMiss;
+        ++NumL1DCacheMisses;
+        if (onCacheRef(*MDA, *L2DCache)) {
+          ++NumL2DCacheMisses;
+          ++CAS.NumL2DMiss;
+        }
       }
+      // Check if there are bundled memory accesses
+      if (auto &BMA = MDA->BundledMAs)
+        if (BMAIdx < BMA->Accesses.size()) {
+          MDA = &BMA->Accesses[BMAIdx++];
+          continue;
+        }
+
+      break;
     }
   }
-
-  return CAS;
 }

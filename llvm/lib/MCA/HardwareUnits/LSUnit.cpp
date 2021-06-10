@@ -17,6 +17,7 @@
 #include "llvm/MCA/HardwareUnits/LSUnit.h"
 #include "llvm/MCA/Instruction.h"
 #include "llvm/MCA/MetadataCategories.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 #ifndef NDEBUG
 #include "llvm/Support/Format.h"
@@ -27,6 +28,36 @@
 
 namespace llvm {
 namespace mca {
+
+uint64_t MDMemoryAccess::getExtendedStartAddr() const {
+  if (LLVM_UNLIKELY(BundledMAs))
+    return BundledMAs->ExtendedAddr;
+  else
+    return Addr;
+}
+
+uint64_t MDMemoryAccess::getExtendedEndAddr() const {
+  if (LLVM_UNLIKELY(BundledMAs))
+    return BundledMAs->ExtendedAddr + BundledMAs->ExtendedSize;
+  else
+    return Addr + Size;
+}
+
+void MDMemoryAccess::append(bool NewIsStore,
+                            uint64_t NewAddr, unsigned NewSize) {
+  if (!BundledMAs)
+    BundledMAs = std::make_shared<BundledMemoryAccesses>(Addr, Size);
+  auto &BMA = *BundledMAs;
+
+  if (NewAddr < BMA.ExtendedAddr)
+    BMA.ExtendedAddr = NewAddr;
+
+  uint64_t NewEnd = NewAddr + NewSize;
+  if (NewEnd > BMA.ExtendedAddr + BMA.ExtendedSize)
+    BMA.ExtendedSize = NewEnd - BMA.ExtendedAddr;
+
+  BMA.Accesses.emplace_back(NewIsStore, NewAddr, NewSize);
+}
 
 #ifndef NDEBUG
 raw_ostream &operator<<(raw_ostream &OS, const MDMemoryAccess & MDA) {

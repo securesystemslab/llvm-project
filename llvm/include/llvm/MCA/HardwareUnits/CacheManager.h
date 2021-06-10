@@ -59,20 +59,25 @@ class CacheManager : public HardwareUnit {
   Optional<MDMemoryAccess> getMemoryAccessMD(const InstRef &IR);
 
 public:
-  using CacheAccessStatus = unsigned;
-  static constexpr CacheAccessStatus CAS_L1D_Hit  = 0;
-  static constexpr CacheAccessStatus CAS_L1D_Miss = 1;
-  static constexpr CacheAccessStatus CAS_L2D_Miss = 1 << 1;
+  struct CacheAccessStatus {
+    unsigned NumL1DMiss = 0U;
+    unsigned NumL2DMiss = 0U;
+
+    // True if it's a cache hit
+    operator bool() const {
+      return !NumL1DMiss && !NumL2DMiss;
+    }
+  };
 
   CacheManager(StringRef CacheConfigFile,
                MetadataRegistry &MDR);
 
   /// Return true if there is a cache miss
-  CacheAccessStatus onInstructionIssued(const InstRef &IR);
+  void onInstructionIssued(const InstRef &IR, CacheAccessStatus &CAS);
 
   /// Return the number of penalty cycles for a specific kind of
   /// cache miss.
-  unsigned getPenaltyCycles(CacheAccessStatus CAS);
+  unsigned getPenaltyCycles(const CacheAccessStatus &CAS);
 
   virtual ~CacheManager();
 };

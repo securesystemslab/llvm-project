@@ -89,7 +89,8 @@ void Scheduler::issueInstructionImpl(
     const MemoryGroup &Group = LSU.getGroup(IS->getLSUTokenID());
     IS->setCriticalMemDep(Group.getCriticalPredecessor());
     if (HWCache) {
-      auto CAS = HWCache->onInstructionIssued(IR);
+      CacheManager::CacheAccessStatus CAS;
+      HWCache->onInstructionIssued(IR, CAS);
       if (unsigned PenaltyCycles = HWCache->getPenaltyCycles(CAS))
         IR.getInstruction()->addPenaltyCycles(PenaltyCycles);
     }

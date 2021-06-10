@@ -26,16 +26,54 @@
 namespace llvm {
 namespace mca {
 
-/// Metadata structure for memory access
+/// Metadata structure for memory access.
+/// This structure can be copied by value, however it's not
+/// _trivially_ copyable.
 struct MDMemoryAccess {
   bool IsStore;
   uint64_t Addr;
   unsigned Size;
+
+  struct BundledMemoryAccesses;
+  std::shared_ptr<BundledMemoryAccesses> BundledMAs;
+
+  MDMemoryAccess(bool ST, uint64_t ADR, unsigned SZ,
+                 BundledMemoryAccesses *BMA = nullptr)
+    : IsStore(ST), Addr(ADR), Size(SZ),
+      BundledMAs(BMA) {}
+
+  // Upper bound address of all the memory accesses here
+  uint64_t getExtendedStartAddr() const;
+
+  // Lower bound address of all the memory accesses here
+  uint64_t getExtendedEndAddr() const;
+
+  // Append a memory access to the bundle
+  void append(bool IsStore, uint64_t Addr, unsigned Size);
+};
+
+/// Bundled memory accesses are memory accesses performed in the same
+/// MCInst. Note that `Accesses` should preserve the order of the original
+/// accesses.
+struct MDMemoryAccess::BundledMemoryAccesses {
+  // Upper bound address of the bundled memory accesses
+  uint64_t ExtendedAddr;
+  // Lower bound address of the bundled memory accesses
+  unsigned ExtendedSize;
+  SmallVector<MDMemoryAccess, 2> Accesses;
+
+  BundledMemoryAccesses(uint64_t OriginalAddr, unsigned OriginalSize)
+    : ExtendedAddr(OriginalAddr),
+      ExtendedSize(OriginalSize) {}
 };
 
 inline bool operator<(const MDMemoryAccess &LHS, const MDMemoryAccess &RHS) {
-  return LHS.Addr < RHS.Addr &&
-         uint64_t(LHS.Addr + LHS.Size) <= RHS.Addr;
+  // FIXME: Since it's totally possible all (bundled) memory accesses are sparse,
+  // this comparison can only give you sound but not precise result (extremely
+  // imprecise if the density is low).
+  // In order to yield a precise comparison, one might need to sort all the
+  // bundled memory accesses before comparing them, which is expensive.
+  return LHS.getExtendedEndAddr() <= RHS.getExtendedStartAddr();
 }
 #ifndef NDEBUG
 raw_ostream &operator<<(raw_ostream &OS, const MDMemoryAccess & MDA);
