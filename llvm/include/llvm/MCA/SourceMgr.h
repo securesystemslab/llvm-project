@@ -85,7 +85,6 @@ class IncrementalSourceMgr : public SourceMgrBase {
 
   std::list<Instruction*> Staging;
 
-  // FIXME: What happen when this overflow?
   unsigned TotalCounter;
 
   bool EOS;
@@ -167,11 +166,6 @@ public:
       OS << "Error: Number of created instructions "
          << "are more than number of issued instructions\n";
     }
-  }
-#else
-  void printStatistic(raw_ostream &OS) {
-    OS << "Statistic for IncrementalSourceMgr "
-       << "is only available in debug build\n";
   }
 #endif
 };
