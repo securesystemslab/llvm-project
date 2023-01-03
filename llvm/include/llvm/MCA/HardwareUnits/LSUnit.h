@@ -317,7 +317,7 @@ public:
   bool isStore(const InstrDesc &Desc,
                const Optional<MDMemoryAccess> &MDA) const {
     if (MDA)
-      return MDA->IsStore;
+      return MDA->IsStore || Desc.MayStore;
     else
       return Desc.MayStore;
   }
