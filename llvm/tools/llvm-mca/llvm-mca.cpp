@@ -575,7 +575,7 @@ int main(int argc, char **argv) {
     if (PrintInstructionTables) {
       //  Create a pipeline, stages, and a printer.
       auto P = std::make_unique<mca::Pipeline>();
-      P->appendStage(std::make_unique<mca::EntryStage>(S));
+      P->appendStage(std::make_unique<mca::EntryStage>(S, *STI));
       P->appendStage(std::make_unique<mca::InstructionTables>(SM));
       mca::PipelinePrinter Printer(*P, mca::View::OK_READABLE);
 

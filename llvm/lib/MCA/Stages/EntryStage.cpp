@@ -12,6 +12,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "llvm/MCA/Context.h"
+#include "llvm/MCA/MetadataCategories.h"
 #include "llvm/MCA/MetadataRegistry.h"
 #include "llvm/MCA/Stages/EntryStage.h"
 #include "llvm/MCA/Instruction.h"
@@ -46,10 +48,21 @@ Error EntryStage::getNextInstruction() {
   return llvm::ErrorSuccess();
 }
 
-llvm::Error EntryStage::execute(InstRef & /*unused */) {
+llvm::Error EntryStage::execute(InstRef &IR) {
   assert(CurrentInstruction && "There is no instruction to process!");
   if (llvm::Error Val = moveToTheNextStage(CurrentInstruction))
     return Val;
+
+  // We are trying to incorporate branch mispredction information
+  const MCSchedModel &SM = STI.getSchedModel();
+  if (MDRegistry && IR.getInstruction()->getMetadataToken()) {
+    auto &Registry = (*MDRegistry)[MD_FrontEnd_BranchFlow];
+    unsigned MDTok = *IR.getInstruction()->getMetadataToken();
+    auto is_mispredict = Registry.get<bool>(MDTok);
+    if (is_mispredict) {
+      IR.getInstruction()->addPenaltyCycles(SM.MispredictPenalty);
+    }
+  }
 
   // Move the program counter.
   CurrentInstruction.invalidate();

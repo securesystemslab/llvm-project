@@ -30,6 +30,7 @@ class EntryStage final : public Stage {
   SourceMgrBase &SM;
   unsigned NumRetired;
   MetadataRegistry *MDRegistry;
+  const MCSubtargetInfo &STI;
 
   // Updates the program counter, and sets 'CurrentInstruction'.
   Error getNextInstruction();
@@ -38,8 +39,8 @@ class EntryStage final : public Stage {
   EntryStage &operator=(const EntryStage &Other) = delete;
 
 public:
-  EntryStage(SourceMgrBase &SM, MetadataRegistry *MDR = nullptr)
-    : CurrentInstruction(), SM(SM), NumRetired(0), MDRegistry(MDR) { }
+  EntryStage(SourceMgrBase &SM, const MCSubtargetInfo& STI, MetadataRegistry *MDR = nullptr)
+    : CurrentInstruction(), SM(SM), NumRetired(0), MDRegistry(MDR), STI(STI) { }
 
   bool isAvailable(const InstRef &IR) const override;
   bool hasWorkToComplete() const override;

@@ -5,6 +5,9 @@ namespace mca {
 // Metadata for LSUnit
 static constexpr unsigned MD_LSUnit_MemAccess = 0;
 
+// Metadata for Branch Prediction
+static constexpr unsigned MD_FrontEnd_BranchFlow = 0;
+
 // Used for marking the start of custom MD Category
 static constexpr unsigned MD_LAST = MD_LSUnit_MemAccess;
 } // end namespace mca

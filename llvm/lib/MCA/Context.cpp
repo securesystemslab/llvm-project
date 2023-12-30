@@ -51,7 +51,7 @@ Context::createDefaultPipeline(const PipelineOptions &Opts, SourceMgrBase &SrcMg
   auto HWS = std::make_unique<Scheduler>(SM, *LSU, HWC.get());
 
   // Create the pipeline stages.
-  auto Fetch = std::make_unique<EntryStage>(SrcMgr, getMetadataRegistry());
+  auto Fetch = std::make_unique<EntryStage>(SrcMgr, STI, getMetadataRegistry());
   auto Dispatch = std::make_unique<DispatchStage>(STI, MRI, Opts.DispatchWidth,
                                                    *RCU, *PRF);
   auto Execute =
@@ -85,7 +85,7 @@ Context::createInOrderPipeline(const PipelineOptions &Opts, SourceMgrBase &SrcMg
   auto PRF = std::make_unique<RegisterFile>(SM, MRI, Opts.RegisterFileSize);
 
   // Create the pipeline stages.
-  auto Entry = std::make_unique<EntryStage>(SrcMgr);
+  auto Entry = std::make_unique<EntryStage>(SrcMgr, STI);
   auto InOrderIssue = std::make_unique<InOrderIssueStage>(STI, *PRF, CB);
   auto StagePipeline = std::make_unique<Pipeline>();
 
