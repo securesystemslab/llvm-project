@@ -60,6 +60,7 @@ llvm::Error EntryStage::execute(InstRef &IR) {
     unsigned MDTok = *IR.getInstruction()->getMetadataToken();
     auto is_mispredict = Registry.get<bool>(MDTok);
     if (is_mispredict) {
+      errs() << "[FrontEnd] Branch mispredict identified!";
       IR.getInstruction()->addPenaltyCycles(SM.MispredictPenalty);
     }
   }
