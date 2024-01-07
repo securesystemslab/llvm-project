@@ -108,7 +108,7 @@ bool LSUnitBase::noAlias(unsigned GID,
     LLVM_DEBUG(dbgs() << "[LSUnit][MD]: GID is alias with MDA: "
                       << toStringRef(!Result) << "\n");
     if (!Result) {
-        errs() << "[LSUnit] We have alias!\n";
+        LLVM_DEBUG(dbgs() << "[LSUnit] We have alias!\n");
     }
     return Result;
   } else

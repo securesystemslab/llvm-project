@@ -12,11 +12,14 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Support/Debug.h"
 #include "llvm/MCA/Context.h"
 #include "llvm/MCA/MetadataCategories.h"
 #include "llvm/MCA/MetadataRegistry.h"
 #include "llvm/MCA/Stages/EntryStage.h"
 #include "llvm/MCA/Instruction.h"
+
+#define DEBUG_TYPE "llvm-mca"
 
 namespace llvm {
 namespace mca {
@@ -41,8 +44,23 @@ Error EntryStage::getNextInstruction() {
       return llvm::ErrorSuccess();
   }
   SourceRef SR = SM.peekNext();
+
   std::unique_ptr<Instruction> Inst = std::make_unique<Instruction>(SR.second);
   CurrentInstruction = InstRef(SR.first, Inst.get());
+
+  // We are trying to incorporate branch misprediction information
+  const MCSchedModel &SchedModel = STI.getSchedModel();
+  if (MDRegistry) {
+    if (auto MDTok = Inst->getMetadataToken()) {
+      auto &Registry = (*MDRegistry)[MD_FrontEnd_BranchFlow];
+      auto is_mispredict = Registry.get<bool>(*MDTok);
+      if (is_mispredict) {
+        LLVM_DEBUG(dbgs() << "[FrontEnd] Branch mispredict identified!\n");
+        Inst->addPenaltyCycles(SchedModel.MispredictPenalty);
+      }
+    }
+  }
+
   Instructions.emplace_back(std::move(Inst));
   SM.updateNext();
   return llvm::ErrorSuccess();
@@ -52,18 +70,6 @@ llvm::Error EntryStage::execute(InstRef &IR) {
   assert(CurrentInstruction && "There is no instruction to process!");
   if (llvm::Error Val = moveToTheNextStage(CurrentInstruction))
     return Val;
-
-  // We are trying to incorporate branch mispredction information
-  const MCSchedModel &SM = STI.getSchedModel();
-  if (MDRegistry && IR.getInstruction()->getMetadataToken()) {
-    auto &Registry = (*MDRegistry)[MD_FrontEnd_BranchFlow];
-    unsigned MDTok = *IR.getInstruction()->getMetadataToken();
-    auto is_mispredict = Registry.get<bool>(MDTok);
-    if (is_mispredict) {
-      errs() << "[FrontEnd] Branch mispredict identified!";
-      IR.getInstruction()->addPenaltyCycles(SM.MispredictPenalty);
-    }
-  }
 
   // Move the program counter.
   CurrentInstruction.invalidate();

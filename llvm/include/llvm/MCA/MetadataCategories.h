@@ -6,10 +6,10 @@ namespace mca {
 static constexpr unsigned MD_LSUnit_MemAccess = 0;
 
 // Metadata for Branch Prediction
-static constexpr unsigned MD_FrontEnd_BranchFlow = 0;
+static constexpr unsigned MD_FrontEnd_BranchFlow = 1;
 
 // Used for marking the start of custom MD Category
-static constexpr unsigned MD_LAST = MD_LSUnit_MemAccess;
+static constexpr unsigned MD_LAST = MD_FrontEnd_BranchFlow;
 } // end namespace mca
 } // end namespace llvm
 #endif
