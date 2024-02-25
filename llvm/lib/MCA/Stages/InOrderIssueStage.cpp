@@ -134,10 +134,11 @@ bool InOrderIssueStage::canExecute(const InstRef &IR) {
     return false;
   }
 
-  if (unsigned CustomStallCycles = CB.checkCustomHazard(IssuedInst, IR)) {
-    SI.update(IR, CustomStallCycles, StallInfo::StallKind::CUSTOM_STALL);
-    return false;
-  }
+  // XXX: MCAD: Custom hack!
+  // if (unsigned CustomStallCycles = CB.checkCustomHazard(IssuedInst, IR)) {
+  //   SI.update(IR, CustomStallCycles, StallInfo::StallKind::CUSTOM_STALL);
+  //   return false;
+  // }
 
   if (LastWriteBackCycle) {
     if (!IR.getInstruction()->getDesc().RetireOOO) {

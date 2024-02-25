@@ -87,7 +87,7 @@ Context::createInOrderPipeline(const PipelineOptions &Opts, SourceMgrBase &SrcMg
                                       Opts.StoreQueueSize, Opts.AssumeNoAlias);
 
   // Create the pipeline stages.
-  auto Entry = std::make_unique<EntryStage>(SrcMgr);
+  auto Entry = std::make_unique<EntryStage>(SrcMgr, STI);
   auto InOrderIssue = std::make_unique<InOrderIssueStage>(STI, *PRF, CB, *LSU);
   auto StagePipeline = std::make_unique<Pipeline>();
 
